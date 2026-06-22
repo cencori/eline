@@ -2,6 +2,8 @@
 
 Build agents faster than the speed of light.
 
+> Site: [cencori.com/zett](https://cencori.com/zett) &middot; Docs: [cencori.com/zett/docs](https://cencori.com/zett/docs)
+
 ```
 npx zett@latest init my-agent
 ```
