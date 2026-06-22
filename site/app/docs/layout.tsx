@@ -7,21 +7,21 @@ export default function DocsLayout({
 }) {
   return (
     <div className="flex min-h-dvh">
-      <aside className="hidden md:flex w-64 flex-col gap-1 p-8 border-r border-border bg-card/50">
+      <aside className="hidden md:flex w-56 flex-col gap-1 p-6 border-r border-border/30 bg-card/50">
         <Link
           href="/"
-          className="font-semibold tracking-tight text-base mb-6 hover:text-accent transition-colors"
+          className="font-semibold tracking-tight text-sm mb-6 hover:text-accent transition-colors"
         >
-          ← Zett
+          &larr; Zett
         </Link>
-        <span className="text-xs font-medium tracking-widest uppercase text-muted mb-2">
+        <span className="text-[10px] font-medium tracking-widest uppercase text-muted mb-2">
           Docs
         </span>
         {links.map((l) => (
           <Link
             key={l.href}
             href={l.href}
-            className="text-sm text-muted hover:text-zinc-100 transition-colors py-1"
+            className="text-xs text-muted hover:text-foreground transition-colors py-1"
           >
             {l.label}
           </Link>

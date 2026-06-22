@@ -1,19 +1,33 @@
 @import "tailwindcss";
 
-@theme {
+@theme inline {
   --font-sans: "Geist", system-ui, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, monospace;
-  --color-surface: #0a0a0b;
-  --color-card: #121213;
-  --color-elevated: #1a1a1b;
-  --color-border: #27272a;
-  --color-muted: #a1a1aa;
-  --color-accent: #a855f7;
-  --color-accent-soft: #a855f7 / 0.15;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+}
+
+:root {
+  --background: #0a0a0b;
+  --foreground: #ffffff;
+  --card: #121213;
+  --card-foreground: #ffffff;
+  --muted: #a1a1aa;
+  --muted-foreground: #737373;
+  --border: #27272a;
+  --accent: #a855f7;
+  --accent-soft: color-mix(in srgb, #a855f7 15%, transparent);
 }
 
 *::selection {
-  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 html {
