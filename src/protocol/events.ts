@@ -171,6 +171,23 @@ export function createSessionCompleted(): SessionCompletedEvent {
   return { type: "session.completed" };
 }
 
+export function createToolCallStarted(
+  name: string, input: unknown, callId: string,
+  sequence: number, stepIndex: number, turnId: string,
+): ToolCallStartedEvent {
+  return { type: "tool.started", data: { name, input, callId, sequence, stepIndex, turnId } };
+}
+
+export function createToolCallCompleted(
+  name: string, output: unknown, callId: string, status: ActionResultStatus,
+  error?: ActionResultError, sequence?: number, stepIndex?: number, turnId?: string,
+): ToolCallCompletedEvent {
+  return {
+    type: "tool.completed",
+    data: { name, output, callId, status, ...(error ? { error } : {}), sequence: sequence ?? 1, stepIndex: stepIndex ?? 0, turnId: turnId ?? "" },
+  };
+}
+
 export function encodeEvent(event: StreamEvent): string {
   return JSON.stringify(event) + "\n";
 }

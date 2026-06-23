@@ -1,10 +1,10 @@
 import { loadAgent, type LoadedAgent } from "../loader.js";
-import { discoverAgent } from "../discover/index.js";
 import type { TurnContext, ToolCallContext } from "../types.js";
 import {
   createSessionStarted, createTurnStarted, createMessageReceived,
   createMessageAppended, createMessageCompleted, createStepStarted,
   createStepCompleted, createSessionWaiting, createTurnCompleted,
+  createSessionCompleted, createToolCallStarted, createToolCallCompleted,
   type StreamEvent,
 } from "../protocol/events.js";
 
@@ -59,35 +59,13 @@ async function createSession(
   return data.id;
 }
 
-async function submitTurn(
-  endpoint: string,
-  apiKey: string,
-  agent: LoadedAgent,
-  sessionId: string,
-  input: string,
-  stream: boolean,
-): Promise<Response> {
-  const model = agent.manifest.config.model;
-  const instructions = agent.manifest.instructions;
-  const tools = Object.entries(agent.manifest.tools).map(([name, tool]) => ({
+function buildToolDefinitions(agent: LoadedAgent) {
+  return Object.entries(agent.manifest.tools).map(([name, tool]) => ({
     name,
     description: tool.description,
     input_schema: tool.inputSchema ? {} : undefined,
     type: "function" as const,
   }));
-
-  return fetch(`${endpoint}/sessions/${sessionId}/turns`, {
-    method: "POST",
-    headers: headers(apiKey, agent),
-    body: JSON.stringify({
-      model,
-      input,
-      instructions,
-      tools: tools.length > 0 ? tools : undefined,
-      stream,
-      pause_on_tool_calls: false,
-    }),
-  });
 }
 
 export async function runAgent(
@@ -99,6 +77,7 @@ export async function runAgent(
   const endpoint = options.endpoint || process.env.CENCORI_API_URL || DEFAULT_ENDPOINT;
   const apiKey = options.apiKey || process.env.CENCORI_API_KEY || "";
   const events: StreamEvent[] = [];
+  let outputText = "";
 
   if (!apiKey) {
     throw new Error(
@@ -107,130 +86,74 @@ export async function runAgent(
   }
 
   const sessionId = options.sessionId || await createSession(endpoint, apiKey, agent);
-  const turnId = crypto.randomUUID();
 
-  const emit = (event: StreamEvent) => {
+  for await (const event of streamAgent(agentDir, input, { ...options, sessionId, endpoint, apiKey })) {
     events.push(event);
     options.onEvent?.(event);
-  };
-
-  emit(createSessionStarted(sessionId, {
-    agentId: agent.manifest.config.name ?? "unnamed",
-    modelId: agent.manifest.config.model,
-    zettVersion: "0.1.2",
-  }));
-
-  emit(createTurnStarted(1, turnId));
-  emit(createMessageReceived(input, 1, turnId));
-
-  const response = await submitTurn(endpoint, apiKey, agent, sessionId, input, false);
-
-  if (!response.ok) {
-    const error = await response.text();
-    emit(createTurnCompleted(1, turnId));
-    emit(createSessionCompleted());
-    throw new Error(`Cencori Sessions API error (${response.status}): ${error}`);
-  }
-
-  // Non-streaming: read full SSE body and collect events
-  const body = await response.text();
-  let outputText = "";
-
-  for (const line of body.split("\n")) {
-    if (line.startsWith("data: ")) {
-      try {
-        const data = JSON.parse(line.slice(6));
-        if (data.type === "message.appended" && data.delta) {
-          outputText += data.delta;
-        }
-      } catch {}
+    if (event.type === "message.completed" && event.data.text) {
+      outputText = event.data.text;
     }
   }
 
-  emit(createStepCompleted("stop", 1, 0, turnId));
-  emit(createMessageCompleted(outputText, "stop", 1, 0, turnId));
-  emit(createTurnCompleted(1, turnId));
-  emit(createSessionWaiting());
-
-  const turn: TurnContext = {
-    id: turnId,
-    sessionId,
-    input,
-    output: outputText,
-  };
+  const toolCalls: ToolCallContext[] = [];
+  for (const e of events) {
+    if (e.type === "tool.started") {
+      const completed = events.find(
+        (ev): ev is ReturnType<typeof createToolCallCompleted> =>
+          ev.type === "tool.completed" && ev.data.callId === e.data.callId
+      );
+      toolCalls.push({
+        tool: e.data.name,
+        input: e.data.input,
+        output: completed?.data.output,
+        durationMs: undefined,
+      });
+    }
+  }
 
   return {
     output: outputText,
-    turns: [turn],
+    turns: [{
+      id: events.find(e => e.type === "turn.started")?.data.turnId ?? "",
+      sessionId,
+      input,
+      output: outputText,
+      toolCalls,
+    }],
     events,
     sessionId,
   };
 }
 
-export async function* streamAgent(
-  agentDir: string,
-  input: string,
-  options: RunOptions = {},
-): AsyncGenerator<StreamEvent, void, unknown> {
-  const agent = await loadAgent(agentDir);
-  const endpoint = options.endpoint || process.env.CENCORI_API_URL || DEFAULT_ENDPOINT;
-  const apiKey = options.apiKey || process.env.CENCORI_API_KEY || "";
-  const turnId = crypto.randomUUID();
+// ── SSE event reader ──────────────────────────────────────────────
 
-  if (!apiKey) {
-    throw new Error(
-      "Cencori API key required. Set CENCORI_API_KEY env var or pass apiKey in options.",
-    );
-  }
+type ToolCallInfo = {
+  name: string;
+  args: unknown;
+  actionId: string;
+};
 
-  const sessionId = options.sessionId || await createSession(endpoint, apiKey, agent);
+type TurnResult =
+  | { status: "completed"; text: string }
+  | { status: "paused"; toolCalls: ToolCallInfo[]; text: string };
 
-  const model = agent.manifest.config.model;
-  const instructions = agent.manifest.instructions;
-  const tools = Object.entries(agent.manifest.tools).map(([name, tool]) => ({
-    name,
-    description: tool.description,
-    input_schema: tool.inputSchema ? {} : undefined,
-    type: "function" as const,
-  }));
-
-  yield createSessionStarted(sessionId, {
-    agentId: agent.manifest.config.name ?? "unnamed",
-    modelId: model,
-    zettVersion: "0.1.2",
-  });
-
-  yield createTurnStarted(1, turnId);
-  yield createMessageReceived(input, 1, turnId);
-  yield createStepStarted(1, 0, turnId);
-
-  const response = await fetch(`${endpoint}/sessions/${sessionId}/turns`, {
-    method: "POST",
-    headers: headers(apiKey, agent),
-    body: JSON.stringify({
-      model,
-      input,
-      instructions,
-      tools: tools.length > 0 ? tools : undefined,
-      stream: true,
-      pause_on_tool_calls: false,
-    }),
-  });
-
+async function* readTurnSSE(
+  response: Response,
+  turnId: string,
+): AsyncGenerator<StreamEvent, TurnResult, unknown> {
   if (!response.ok) {
     const error = await response.text();
-    yield createTurnCompleted(1, turnId);
-    yield createSessionCompleted();
     throw new Error(`Cencori Sessions API error (${response.status}): ${error}`);
   }
 
   const reader = response.body?.getReader();
-  if (!reader) return;
+  if (!reader) return { status: "completed", text: "" } as TurnResult;
 
   const decoder = new TextDecoder();
   let buffer = "";
   let currentEvent = "";
   let textSoFar = "";
+  const toolCalls: ToolCallInfo[] = [];
 
   while (true) {
     const { done, value } = await reader.read();
@@ -248,32 +171,214 @@ export async function* streamAgent(
         if (payload === "[DONE]") continue;
         try {
           const parsed = JSON.parse(payload);
+          const eventType = currentEvent || parsed.type;
 
-          // Map Cencori Session events to Zett protocol events
-          switch (currentEvent || parsed.type) {
-            case "message.appended":
+          switch (eventType) {
+            case "turn.started": {
+              yield createTurnStarted(parsed.turn_number ?? 1, turnId);
+              yield createMessageReceived(parsed.input_text ?? "", parsed.turn_number ?? 1, turnId);
+              yield createStepStarted(1, 0, turnId);
+              break;
+            }
+
+            case "output_text.delta": {
               if (parsed.delta) {
                 textSoFar += parsed.delta;
-                yield createMessageAppended(
-                  parsed.delta,
-                  textSoFar,
-                  parsed.sequence ?? 1,
-                  parsed.stepIndex ?? 0,
-                  turnId,
-                );
+                yield createMessageAppended(parsed.delta, textSoFar, 1, 0, turnId);
               }
               break;
-            case "message.completed":
-              if (parsed.text) textSoFar = parsed.text;
+            }
+
+            case "tool_call.started": {
+              toolCalls.push({
+                name: parsed.tool,
+                args: parsed.arguments,
+                actionId: parsed.action_id,
+              });
+              yield createToolCallStarted(
+                parsed.tool,
+                parsed.arguments,
+                parsed.action_id,
+                1,
+                0,
+                turnId,
+              );
               break;
+            }
+
+            case "turn.paused": {
+              currentEvent = "";
+              return {
+                status: "paused",
+                toolCalls: [...toolCalls],
+                text: textSoFar,
+              } as TurnResult;
+            }
+
+            case "turn.completed": {
+              const out = parsed.output;
+              let finalText = textSoFar;
+              if (Array.isArray(out?.output)) {
+                for (const item of out.output) {
+                  if (item.type === "message") {
+                    const tc = item.content?.find((c: any) => c.type === "output_text");
+                    if (tc?.text) finalText = tc.text;
+                  }
+                }
+              }
+              textSoFar = finalText;
+              yield createMessageCompleted(finalText, "stop", 1, 0, turnId);
+              yield createStepCompleted("stop", 1, 0, turnId);
+              yield createTurnCompleted(1, turnId);
+              currentEvent = "";
+              return { status: "completed", text: finalText } as TurnResult;
+            }
+
+            case "turn.resumed": {
+              break;
+            }
+
+            default: {
+              break;
+            }
           }
+
+          currentEvent = "";
         } catch {}
       }
     }
   }
 
-  yield createMessageCompleted(textSoFar || null, "stop", 1, 0, turnId);
-  yield createStepCompleted("stop", 1, 0, turnId);
-  yield createTurnCompleted(1, turnId);
+  return { status: "completed", text: textSoFar } as TurnResult;
+}
+
+// ── Multi-turn agent loop ─────────────────────────────────────────
+
+export async function* streamAgent(
+  agentDir: string,
+  input: string,
+  options: RunOptions = {},
+): AsyncGenerator<StreamEvent, void, unknown> {
+  const agent = await loadAgent(agentDir);
+  const endpoint = options.endpoint || process.env.CENCORI_API_URL || DEFAULT_ENDPOINT;
+  const apiKey = options.apiKey || process.env.CENCORI_API_KEY || "";
+
+  if (!apiKey) {
+    throw new Error(
+      "Cencori API key required. Set CENCORI_API_KEY env var or pass apiKey in options.",
+    );
+  }
+
+  const sessionId = options.sessionId || await createSession(endpoint, apiKey, agent);
+  const model = agent.manifest.config.model;
+  const instructions = agent.manifest.instructions;
+  const tools = buildToolDefinitions(agent);
+
+  yield createSessionStarted(sessionId, {
+    agentId: agent.manifest.config.name ?? "unnamed",
+    modelId: model,
+    zettVersion: "0.1.2",
+  });
+
+  let currentInput = input;
+  let maxTurns = options.maxTurns ?? 25;
+  let turnCount = 0;
+
+  while (turnCount < maxTurns) {
+    turnCount++;
+    const turnId = crypto.randomUUID();
+
+    const response = await fetch(`${endpoint}/sessions/${sessionId}/turns`, {
+      method: "POST",
+      headers: headers(apiKey, agent),
+      body: JSON.stringify({
+        model,
+        input: currentInput,
+        instructions,
+        tools: tools.length > 0 ? tools : undefined,
+        stream: true,
+        pause_on_tool_calls: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      yield createTurnCompleted(1, turnId);
+      yield createSessionCompleted();
+      throw new Error(`Cencori Sessions API error (${response.status}): ${error}`);
+    }
+
+    const eventGen = readTurnSSE(response, turnId);
+    let result: TurnResult = { status: "completed", text: "" };
+
+    for await (const event of eventGen) {
+      yield event;
+    }
+
+    // Get the return value from the generator
+    const next = await eventGen.next();
+    if (!next.done) {
+      // shouldn't happen — generator should be exhausted
+    } else {
+      result = next.value as TurnResult;
+    }
+
+    if (result.status === "paused" && result.toolCalls.length > 0) {
+      const toolResults: Array<{ action_id: string; output: string }> = [];
+
+      for (const tc of result.toolCalls) {
+        const toolDef = agent.manifest.tools[tc.name];
+        if (toolDef?.execute) {
+          try {
+            const output = await toolDef.execute(tc.args);
+            const outputStr = typeof output === "string" ? output : JSON.stringify(output);
+            yield createToolCallCompleted(tc.name, outputStr, tc.actionId, "completed", undefined, 1, 0, turnId);
+            toolResults.push({ action_id: tc.actionId, output: outputStr });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Tool execution failed";
+            yield createToolCallCompleted(tc.name, msg, tc.actionId, "failed", { code: "execution_error", message: msg }, 1, 0, turnId);
+            toolResults.push({ action_id: tc.actionId, output: `Error: ${msg}` });
+          }
+        } else {
+          yield createToolCallCompleted(tc.name, "Tool not found in agent manifest", tc.actionId, "failed", { code: "tool_not_found", message: `Tool "${tc.name}" not defined in agent` }, 1, 0, turnId);
+          toolResults.push({ action_id: tc.actionId, output: "Error: tool not defined" });
+        }
+      }
+
+      const firstActionId = toolResults[0]?.action_id ?? "";
+      if (!firstActionId) break;
+
+      const approveResponse = await fetch(
+        `${endpoint}/sessions/${sessionId}/approve`,
+        {
+          method: "POST",
+          headers: headers(apiKey, agent),
+          body: JSON.stringify({
+            action_id: firstActionId,
+            tool_results: toolResults,
+          }),
+        },
+      );
+
+      if (!approveResponse.ok || !approveResponse.body) {
+        const error = await approveResponse.text();
+        yield createTurnCompleted(1, turnId);
+        yield createSessionCompleted();
+        throw new Error(`Cencori Sessions approve error (${approveResponse.status}): ${error}`);
+      }
+
+      // Read resume SSE stream
+      const resumeGen = readTurnSSE(approveResponse, turnId);
+      for await (const event of resumeGen) {
+        yield event;
+      }
+
+      currentInput = result.text;
+      continue;
+    }
+
+    break;
+  }
+
   yield createSessionWaiting();
 }
