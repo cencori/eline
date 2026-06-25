@@ -13,7 +13,7 @@ import type {
   ScheduleConfig,
   SessionConfig,
   PolicyConfig,
-} from "./types.js";
+} from "./types";
 
 export interface LoadedAgent {
   manifest: AgentManifest;

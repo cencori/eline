@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import type { SkillConfig } from "../types.js";
+import type { SkillConfig } from "../types";
 
 export function defineSkill(config: SkillConfig): SkillConfig {
   if (!config.name || !config.content) {

@@ -1,4 +1,4 @@
-import type { ScheduleConfig } from "../types.js";
+import type { ScheduleConfig } from "../types";
 
 export function defineSchedule(config: ScheduleConfig): ScheduleConfig {
   if (!config.name || !config.cron || !config.handler) {

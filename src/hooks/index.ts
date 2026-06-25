@@ -1,4 +1,4 @@
-import type { HookConfig } from "../types.js";
+import type { HookConfig } from "../types";
 
 export function defineHook(config: HookConfig): HookConfig {
   if (!config.name || !config.event || !config.handler) {

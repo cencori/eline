@@ -1,4 +1,4 @@
-import type { ChannelConfig } from "../types.js";
+import type { ChannelConfig } from "../types";
 
 export function defineChannel(config: ChannelConfig): ChannelConfig {
   if (!config.name || !config.handler) {

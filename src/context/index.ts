@@ -1,4 +1,4 @@
-import type { Session, TurnContext } from "../types.js";
+import type { Session, TurnContext } from "../types";
 
 let currentSession: Session | null = null;
 let currentTurn: TurnContext | null = null;

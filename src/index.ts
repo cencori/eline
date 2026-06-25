@@ -1,22 +1,22 @@
-export { defineAgent } from "./agent/index.js";
-export { defineInstructions, loadInstructions } from "./instructions/index.js";
-export { defineTool } from "./tools/index.js";
-export { defineSkill, getSkill } from "./skills/index.js";
-export { defineHook } from "./hooks/index.js";
-export { defineChannel, POST, GET } from "./channels/index.js";
-export { defineSchedule } from "./schedules/index.js";
-export { getSession, getTurn, getContext, requireContext, hasContext, setContext, ensureContext } from "./context/index.js";
-export { loadAgent } from "./loader.js";
-export { runAgent, streamAgent } from "./runner/index.js";
-export { discoverAgent } from "./discover/index.js";
-export { bearer, basic } from "./auth/index.js";
-export type { OutboundAuthFn, TokenValue } from "./auth/index.js";
-export type * from "./types.js";
-export type * from "./protocol/events.js";
+export { defineAgent } from "./agent/index";
+export { defineInstructions, loadInstructions } from "./instructions/index";
+export { defineTool } from "./tools/index";
+export { defineSkill, getSkill } from "./skills/index";
+export { defineHook } from "./hooks/index";
+export { defineChannel, POST, GET } from "./channels/index";
+export { defineSchedule } from "./schedules/index";
+export { getSession, getTurn, getContext, requireContext, hasContext, setContext, ensureContext } from "./context/index";
+export { loadAgent } from "./loader";
+export { runAgent, streamAgent } from "./runner/index";
+export { discoverAgent } from "./discover/index";
+export { bearer, basic } from "./auth/index";
+export type { OutboundAuthFn, TokenValue } from "./auth/index";
+export type * from "./types";
+export type * from "./protocol/events";
 export {
   createSessionStarted, createTurnStarted, createMessageReceived,
   createMessageAppended, createMessageCompleted, createStepStarted,
   createStepCompleted, createTurnCompleted, createSessionWaiting,
   createSessionCompleted, encodeEvent, encodeEvents,
-} from "./protocol/events.js";
-export type { StreamEvent } from "./protocol/events.js";
+} from "./protocol/events";
+export type { StreamEvent } from "./protocol/events";
