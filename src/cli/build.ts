@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
-import { loadAgent } from "../loader.js";
-import { discoverAgent } from "../discover/index.js";
+import { loadAgent } from "../loader";
+import { discoverAgent } from "../discover/index";
 
 export async function buildCommand(options: {
   agentDir: string;

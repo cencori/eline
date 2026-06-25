@@ -1,10 +1,10 @@
 import { createServer } from "node:http";
 import { resolve } from "node:path";
-import { loadAgent } from "../loader.js";
-import { discoverAgent } from "../discover/index.js";
-import { streamAgent } from "../runner/index.js";
-import { showBanner } from "./banner.js";
-import { encodeEvents, type StreamEvent } from "../protocol/events.js";
+import { loadAgent } from "../loader";
+import { discoverAgent } from "../discover/index";
+import { streamAgent } from "../runner/index";
+import { showBanner } from "./banner";
+import { encodeEvents, type StreamEvent } from "../protocol/events";
 
 export async function devCommand(options: {
   port: string;

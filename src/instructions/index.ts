@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import type { InstructionsConfig } from "../types.js";
+import type { InstructionsConfig } from "../types";
 
 export function defineInstructions(
   source: string | InstructionsConfig

@@ -1,8 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    // tsup's .d.ts generator hard-injects the (now TS7-removed) `baseUrl` option;
+    // we don't use baseUrl ourselves. Remove once tsup stops injecting it.
+    "ignoreDeprecations": "6.0",
     "lib": ["ES2022"],
     "outDir": "dist",
     "rootDir": "src",
@@ -13,8 +16,9 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "types": ["node"],
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist", "templates", "docs"]
+  "exclude": ["node_modules", "dist", "templates", "docs"],
 }

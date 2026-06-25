@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { initCommand } from "./init.js";
-import { devCommand } from "./dev.js";
-import { buildCommand } from "./build.js";
-import { showBanner } from "./banner.js";
+import { initCommand } from "./init";
+import { devCommand } from "./dev";
+import { buildCommand } from "./build";
+import { showBanner } from "./banner";
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";

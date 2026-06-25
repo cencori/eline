@@ -1,0 +1,3 @@
+# esbuild ships a postinstall that fetches its native binary; tsup needs it.
+allowBuilds:
+  esbuild: true

@@ -1,4 +1,4 @@
-import type { ToolConfig } from "../types.js";
+import type { ToolConfig } from "../types";
 
 export function defineTool<TInput = unknown, TOutput = unknown>(
   config: ToolConfig<TInput, TOutput>
