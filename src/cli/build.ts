@@ -39,12 +39,19 @@ export async function buildCommand(options: {
       hooks: Object.keys(agent.manifest.hooks),
       channels: Object.keys(agent.manifest.channels),
       schedules: Object.keys(agent.manifest.schedules),
+      subagents: Object.fromEntries(
+        Object.entries(agent.manifest.subagents).map(([id, sub]) => [
+          id,
+          { description: sub.config.description, tools: Object.keys(sub.tools) },
+        ])
+      ),
       discovered: {
         tools: discovered.tools.map((t) => t.name),
         skills: discovered.skills.map((s) => s.name),
         hooks: discovered.hooks.map((h) => h.name),
         channels: discovered.channels.map((c) => c.name),
         schedules: discovered.schedules.map((s) => s.name),
+        subagents: discovered.subagents.map((s) => s.id),
       },
       session: agent.manifest.session,
       policy: agent.manifest.policy,
@@ -60,6 +67,7 @@ export async function buildCommand(options: {
     console.log(`  Skills: ${manifest.skills.length}`);
     console.log(`  Channels: ${manifest.channels.length}`);
     console.log(`  Schedules: ${manifest.schedules.length}`);
+    console.log(`  Subagents: ${Object.keys(manifest.subagents).length}`);
     console.log(`\n  Done.\n`);
   } catch (err) {
     console.error(`  Build failed:`, err);

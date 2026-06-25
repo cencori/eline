@@ -122,6 +122,20 @@ export interface PolicyConfig {
   };
 }
 
+/**
+ * A subagent is a fully self-contained child agent the orchestrator can
+ * delegate a focused subtask to. It runs in its own fresh, isolated session —
+ * it never inherits the parent's conversation history; the parent passes all
+ * needed context in via the delegation `message`.
+ */
+export interface SubagentManifest {
+  /** The child agent's config. `description` is required (validated at load). */
+  config: AgentConfig;
+  instructions: string;
+  tools: Record<string, ToolConfig>;
+  skills: Record<string, SkillConfig>;
+}
+
 export interface AgentManifest {
   config: AgentConfig;
   instructions: string;
@@ -130,6 +144,8 @@ export interface AgentManifest {
   hooks: Record<string, HookConfig>;
   channels: Record<string, ChannelConfig>;
   schedules: Record<string, ScheduleConfig>;
+  /** Declared specialists under `subagents/<id>/`, keyed by directory name. */
+  subagents: Record<string, SubagentManifest>;
   session?: SessionConfig;
   policy?: PolicyConfig;
 }

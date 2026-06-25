@@ -13,6 +13,7 @@ import type {
   ScheduleConfig,
   SessionConfig,
   PolicyConfig,
+  SubagentManifest,
 } from "./types";
 
 export interface LoadedAgent {
@@ -47,6 +48,7 @@ export async function loadAgent(agentDir: string): Promise<LoadedAgent> {
   const hooks = await loadDirectory<HookConfig>(absDir, "hooks");
   const channels = await loadDirectory<ChannelConfig>(absDir, "channels");
   const schedules = await loadDirectory<ScheduleConfig>(absDir, "schedules");
+  const subagents = await loadSubagents(absDir);
   const session = loadSessionConfig(absDir);
   const policy = loadPolicyConfig(absDir);
 
@@ -60,10 +62,62 @@ export async function loadAgent(agentDir: string): Promise<LoadedAgent> {
       hooks,
       channels,
       schedules,
+      subagents,
       session: session ?? undefined,
       policy: policy ?? undefined,
     },
   };
+}
+
+/**
+ * Loads each `subagents/<id>/` directory as a self-contained child agent.
+ * Unlike the other slots, subagents are *directories* (not flat files): every
+ * one is a mini-agent with its own config, instructions, tools, and skills.
+ * A subagent must declare a `description` so the orchestrator knows when to
+ * delegate to it — a missing one is a hard authoring error.
+ */
+async function loadSubagents(
+  agentDir: string
+): Promise<Record<string, SubagentManifest>> {
+  const dirPath = resolve(agentDir, "subagents");
+  if (!existsSync(dirPath)) return {};
+
+  const result: Record<string, SubagentManifest> = {};
+
+  for (const entry of readdirSync(dirPath, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+    const id = entry.name;
+    const subDir = resolve(dirPath, id);
+
+    const agentFile = resolve(subDir, "agent.ts");
+    if (!existsSync(agentFile)) {
+      throw new Error(`Subagent "${id}" is missing agent.ts`);
+    }
+
+    let mod: { default?: AgentConfig };
+    try {
+      mod = await import(agentFile);
+    } catch (err) {
+      throw new Error(`Failed to load subagent "${id}": ${(err as Error).message}`);
+    }
+
+    const config = mod.default;
+    if (!config) {
+      throw new Error(`Subagent "${id}" agent.ts must have a default export`);
+    }
+    if (!config.description) {
+      throw new Error(`Subagent "${id}" must declare a description in agent.ts`);
+    }
+
+    result[id] = {
+      config,
+      instructions: loadInstructionsFile(subDir),
+      tools: await loadDirectory<ToolConfig>(subDir, "tools"),
+      skills: await loadDirectory<SkillConfig>(subDir, "skills"),
+    };
+  }
+
+  return result;
 }
 
 function loadInstructionsFile(agentDir: string): string {

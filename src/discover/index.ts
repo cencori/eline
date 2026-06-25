@@ -8,6 +8,16 @@ export interface DiscoveredSlot {
   kind: "flat" | "named";
 }
 
+/** A subagent is a nested agent directory, not a flat file. */
+export interface DiscoveredSubagent {
+  id: string;
+  root: string;
+  agentConfig?: string;
+  instructions?: string;
+  tools: DiscoveredSlot[];
+  skills: DiscoveredSlot[];
+}
+
 export interface DiscoveredAgent {
   root: string;
   agentConfig?: string;
@@ -18,7 +28,7 @@ export interface DiscoveredAgent {
   channels: DiscoveredSlot[];
   schedules: DiscoveredSlot[];
   connections: DiscoveredSlot[];
-  subagents: DiscoveredSlot[];
+  subagents: DiscoveredSubagent[];
   lib: DiscoveredSlot[];
 }
 
@@ -66,7 +76,7 @@ export function discoverAgent(agentDir: string): DiscoverResult {
     channels: discoverNamedDirectory(root, "channels", entries, CHANNEL_SLUG, diagnostics),
     schedules: discoverNamedDirectory(root, "schedules", entries, TOOL_SLUG, diagnostics),
     connections: discoverNamedDirectory(root, "connections", entries, CONNECTION_SLUG, diagnostics),
-    subagents: discoverNamedDirectory(root, "subagents", entries, TOOL_SLUG, diagnostics),
+    subagents: discoverSubagents(root, entries, diagnostics),
     lib: discoverNamedDirectory(root, "lib", entries, TOOL_SLUG, diagnostics),
   };
 
@@ -174,4 +184,61 @@ function discoverNamedDirectory(root: string, dirName: string, entries: Dirent[]
   }
 
   return slots.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function discoverSubagents(root: string, entries: Dirent[], diagnostics: DiscoverDiagnostic[]): DiscoveredSubagent[] {
+  const dirEntry = entries.find(e => e.isDirectory() && e.name === "subagents");
+  if (!dirEntry) return [];
+
+  const subagentsDir = join(root, "subagents");
+  const result: DiscoveredSubagent[] = [];
+
+  let ids: Dirent[];
+  try {
+    ids = readdirSync(subagentsDir, { withFileTypes: true });
+  } catch {
+    diagnostics.push({
+      code: "DIRECTORY_READ_ERROR",
+      message: `Could not read directory: ${subagentsDir}`,
+      severity: "error",
+    });
+    return [];
+  }
+
+  for (const idEntry of ids) {
+    if (!idEntry.isDirectory() || idEntry.name.startsWith(".")) continue;
+    const id = idEntry.name;
+    const subRoot = join(subagentsDir, id);
+
+    if (!TOOL_SLUG.test(id)) {
+      diagnostics.push({
+        code: "INVALID_SLOT_NAME",
+        message: `Invalid subagent name "${id}" — does not match slug pattern.`,
+        severity: "warning",
+        filePath: subRoot,
+      });
+    }
+
+    const subEntries = readdirSync(subRoot, { withFileTypes: true });
+    const agentConfig = discoverFlatModule(subRoot, "agent", subEntries, diagnostics);
+    if (!agentConfig) {
+      diagnostics.push({
+        code: "SUBAGENT_MISSING_CONFIG",
+        message: `Subagent "${id}" is missing agent.ts`,
+        severity: "error",
+        filePath: subRoot,
+      });
+    }
+
+    result.push({
+      id,
+      root: subRoot,
+      agentConfig,
+      instructions: discoverInstructions(subRoot, subEntries, diagnostics),
+      tools: discoverNamedDirectory(subRoot, "tools", subEntries, TOOL_SLUG, diagnostics),
+      skills: discoverNamedDirectory(subRoot, "skills", subEntries, TOOL_SLUG, diagnostics),
+    });
+  }
+
+  return result.sort((a, b) => a.id.localeCompare(b.id));
 }
