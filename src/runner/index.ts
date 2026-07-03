@@ -283,7 +283,7 @@ export async function* streamAgent(
   yield createSessionStarted(sessionId, {
     agentId: agent.manifest.config.name ?? "unnamed",
     modelId: model,
-    elineVersion: "0.1.2",
+    arcieVersion: "0.1.2",
   });
 
   const turnId = crypto.randomUUID();

@@ -21,8 +21,8 @@ showBanner();
 const program = new Command();
 
 program
-  .name("eline")
-  .description("Eline — the electronic line, build agents at the speed of light")
+  .name("arcie")
+  .description("Arcie — the electronic line, build agents at the speed of light")
   .version(version);
 
 program
@@ -43,7 +43,7 @@ program
   .command("build")
   .description("Compile the agent for production")
   .option("--agent-dir <path>", "Path to agent directory", "agent")
-  .option("--out-dir <path>", "Output directory", ".eline")
+  .option("--out-dir <path>", "Output directory", ".arcie")
   .action(buildCommand);
 
 program.parse(process.argv);

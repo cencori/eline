@@ -17,7 +17,7 @@ export interface SessionStartedEvent {
   type: "session.started";
   data: {
     sessionId: string;
-    runtime?: { agentId: string; modelId: string; elineVersion: string };
+    runtime?: { agentId: string; modelId: string; arcieVersion: string };
   };
 }
 

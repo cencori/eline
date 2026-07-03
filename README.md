@@ -1,11 +1,11 @@
-# Eline
+# Arcie
 
 The electronic line — build agents at the speed of light.
 
-> Site: [cencori.com/eline](https://cencori.com/eline) &middot; Docs: [cencori.com/eline/docs](https://cencori.com/eline/docs)
+> Site: [cencori.com/arcie](https://cencori.com/arcie) &middot; Docs: [cencori.com/arcie/docs](https://cencori.com/arcie/docs)
 
 ```
-npx eline@latest init my-agent
+npx arcie@latest init my-agent
 ```
 
 ```
@@ -27,7 +27,7 @@ my-agent/
 ## Quick Start
 
 ```bash
-npx eline@latest init my-agent
+npx arcie@latest init my-agent
 cd my-agent
 npm run dev
 ```
@@ -36,7 +36,7 @@ npm run dev
 
 ```ts
 // agent/agent.ts
-import { defineAgent } from "eline";
+import { defineAgent } from "arcie";
 
 export default defineAgent({
   model: "claude-sonnet-4-5",
@@ -49,7 +49,7 @@ export default defineAgent({
 
 ```ts
 // agent/tools/get_weather.ts
-import { defineTool } from "eline/tools";
+import { defineTool } from "arcie/tools";
 import { z } from "zod";
 
 export default defineTool({

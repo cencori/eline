@@ -3,7 +3,7 @@
 ## Install
 
 ```bash
-npx eline@latest init my-agent
+npx arcie@latest init my-agent
 cd my-agent
 npm install
 ```
@@ -27,7 +27,7 @@ curl -X POST http://localhost:3000 \
 Create `agent/tools/get_weather.ts`:
 
 ```ts
-import { defineTool } from "eline/tools";
+import { defineTool } from "arcie/tools";
 import { z } from "zod";
 
 export default defineTool({

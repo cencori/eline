@@ -4,7 +4,7 @@
   "version": "0.1.2",
   "description": "The electronic line — build agents at the speed of light.",
   "bin": {
-    "eline": "dist/cli/index.js"
+    "arcie": "dist/cli/index.js"
   },
   "files": [
     "dist",
@@ -44,7 +44,7 @@
     "test:watch": "vitest"
   },
   "keywords": [
-    "eline",
+    "arcie",
     "ai",
     "agent",
     "framework",
@@ -55,9 +55,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cencori/eline.git"
+    "url": "git+https://github.com/cencori/arcie.git"
   },
-  "homepage": "https://cencori.com/eline",
+  "homepage": "https://cencori.com/arcie",
   "dependencies": {
     "chalk": "^5.3.0",
     "commander": "^12.0.0",

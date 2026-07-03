@@ -1,9 +1,9 @@
-import { defineAgent } from "eline";
+import { defineAgent } from "arcie";
 
 export default defineAgent({
   model: "claude-sonnet-4-5",
   name: "my-agent",
-  description: "An Eline agent powered by Cencori.",
+  description: "An Arcie agent powered by Cencori.",
   cencori: {
     project: process.env.CENCORI_PROJECT_ID,
     billing: {

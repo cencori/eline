@@ -1,6 +1,6 @@
-# Eline Documentation
+# Arcie Documentation
 
-Eline is a filesystem-first framework for production agents on Cencori.
+Arcie is a filesystem-first framework for production agents on Cencori.
 
 ## Getting Started
 
