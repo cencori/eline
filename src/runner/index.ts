@@ -1,3 +1,4 @@
+import { zodToJsonSchema } from "zod-to-json-schema";
 import { loadAgent, type LoadedAgent } from "../loader.js";
 import type { TurnContext, ToolCallContext } from "../types.js";
 import {
@@ -63,7 +64,9 @@ function buildToolDefinitions(agent: LoadedAgent) {
   return Object.entries(agent.manifest.tools).map(([name, tool]) => ({
     name,
     description: tool.description,
-    input_schema: tool.inputSchema ? {} : undefined,
+    input_schema: tool.inputSchema
+      ? zodToJsonSchema(tool.inputSchema, { target: "openApi3" })
+      : undefined,
     type: "function" as const,
   }));
 }
@@ -218,7 +221,10 @@ async function* readTurnSSE(
             case "turn.completed": {
               const out = parsed.output;
               let finalText = textSoFar;
-              if (Array.isArray(out?.output)) {
+              let finishReason: "stop" | "error" = "stop";
+              if (out?.error) {
+                finishReason = "error";
+              } else if (Array.isArray(out?.output)) {
                 for (const item of out.output) {
                   if (item.type === "message") {
                     const tc = item.content?.find((c: any) => c.type === "output_text");
@@ -227,8 +233,8 @@ async function* readTurnSSE(
                 }
               }
               textSoFar = finalText;
-              yield createMessageCompleted(finalText, "stop", 1, 0, turnId);
-              yield createStepCompleted("stop", 1, 0, turnId);
+              yield createMessageCompleted(finalText, finishReason, 1, 0, turnId);
+              yield createStepCompleted(finishReason, 1, 0, turnId);
               yield createTurnCompleted(1, turnId);
               currentEvent = "";
               return { status: "completed", text: finalText } as TurnResult;
@@ -277,107 +283,92 @@ export async function* streamAgent(
   yield createSessionStarted(sessionId, {
     agentId: agent.manifest.config.name ?? "unnamed",
     modelId: model,
-    zettVersion: "0.1.2",
+    elineVersion: "0.1.2",
   });
 
-  let currentInput = input;
-  let maxTurns = options.maxTurns ?? 25;
-  let turnCount = 0;
+  const turnId = crypto.randomUUID();
+  const maxToolLoops = options.maxTurns ?? 25;
 
-  while (turnCount < maxTurns) {
-    turnCount++;
-    const turnId = crypto.randomUUID();
+  let response = await fetch(`${endpoint}/sessions/${sessionId}/turns`, {
+    method: "POST",
+    headers: headers(apiKey, agent),
+    body: JSON.stringify({
+      model,
+      input,
+      instructions,
+      tools: tools.length > 0 ? tools : undefined,
+      stream: true,
+      pause_on_tool_calls: true,
+    }),
+  });
 
-    const response = await fetch(`${endpoint}/sessions/${sessionId}/turns`, {
-      method: "POST",
-      headers: headers(apiKey, agent),
-      body: JSON.stringify({
-        model,
-        input: currentInput,
-        instructions,
-        tools: tools.length > 0 ? tools : undefined,
-        stream: true,
-        pause_on_tool_calls: true,
-      }),
-    });
+  if (!response.ok) {
+    const error = await response.text();
+    yield createTurnCompleted(1, turnId);
+    yield createSessionCompleted();
+    throw new Error(`Cencori Sessions API error (${response.status}): ${error}`);
+  }
 
-    if (!response.ok) {
-      const error = await response.text();
+  // Tool call loop: pause → execute → approve → resume → repeat
+  for (let loop = 0; loop < maxToolLoops; loop++) {
+    const eventGen = readTurnSSE(response, turnId);
+    let result: TurnResult;
+
+    let iter = await eventGen.next();
+    while (!iter.done) {
+      yield iter.value;
+      iter = await eventGen.next();
+    }
+    result = iter.value;
+
+    if (result.status === "completed") break;
+
+    if (result.status !== "paused" || result.toolCalls.length === 0) break;
+
+    const toolResults: Array<{ action_id: string; output: string }> = [];
+
+    for (const tc of result.toolCalls) {
+      const toolDef = agent.manifest.tools[tc.name];
+      if (toolDef?.execute) {
+        try {
+          const output = await toolDef.execute(tc.args);
+          const outputStr = typeof output === "string" ? output : JSON.stringify(output);
+          yield createToolCallCompleted(tc.name, outputStr, tc.actionId, "completed", undefined, 1, 0, turnId);
+          toolResults.push({ action_id: tc.actionId, output: outputStr });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Tool execution failed";
+          yield createToolCallCompleted(tc.name, msg, tc.actionId, "failed", { code: "execution_error", message: msg }, 1, 0, turnId);
+          toolResults.push({ action_id: tc.actionId, output: `Error: ${msg}` });
+        }
+      } else {
+        yield createToolCallCompleted(tc.name, "Tool not found in agent manifest", tc.actionId, "failed", { code: "tool_not_found", message: `Tool "${tc.name}" not defined in agent` }, 1, 0, turnId);
+        toolResults.push({ action_id: tc.actionId, output: "Error: tool not defined" });
+      }
+    }
+
+    const firstActionId = toolResults[0]?.action_id ?? "";
+    if (!firstActionId) break;
+
+    const approveRes = await fetch(
+      `${endpoint}/sessions/${sessionId}/approve`,
+      {
+        method: "POST",
+        headers: headers(apiKey, agent),
+        body: JSON.stringify({
+          action_id: firstActionId,
+          tool_results: toolResults,
+        }),
+      },
+    );
+
+    if (!approveRes.ok) {
+      const errText = await approveRes.text();
       yield createTurnCompleted(1, turnId);
       yield createSessionCompleted();
-      throw new Error(`Cencori Sessions API error (${response.status}): ${error}`);
+      throw new Error(`Cencori Sessions approve error (${approveRes.status}): ${errText}`);
     }
 
-    const eventGen = readTurnSSE(response, turnId);
-    let result: TurnResult = { status: "completed", text: "" };
-
-    for await (const event of eventGen) {
-      yield event;
-    }
-
-    // Get the return value from the generator
-    const next = await eventGen.next();
-    if (!next.done) {
-      // shouldn't happen — generator should be exhausted
-    } else {
-      result = next.value as TurnResult;
-    }
-
-    if (result.status === "paused" && result.toolCalls.length > 0) {
-      const toolResults: Array<{ action_id: string; output: string }> = [];
-
-      for (const tc of result.toolCalls) {
-        const toolDef = agent.manifest.tools[tc.name];
-        if (toolDef?.execute) {
-          try {
-            const output = await toolDef.execute(tc.args);
-            const outputStr = typeof output === "string" ? output : JSON.stringify(output);
-            yield createToolCallCompleted(tc.name, outputStr, tc.actionId, "completed", undefined, 1, 0, turnId);
-            toolResults.push({ action_id: tc.actionId, output: outputStr });
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : "Tool execution failed";
-            yield createToolCallCompleted(tc.name, msg, tc.actionId, "failed", { code: "execution_error", message: msg }, 1, 0, turnId);
-            toolResults.push({ action_id: tc.actionId, output: `Error: ${msg}` });
-          }
-        } else {
-          yield createToolCallCompleted(tc.name, "Tool not found in agent manifest", tc.actionId, "failed", { code: "tool_not_found", message: `Tool "${tc.name}" not defined in agent` }, 1, 0, turnId);
-          toolResults.push({ action_id: tc.actionId, output: "Error: tool not defined" });
-        }
-      }
-
-      const firstActionId = toolResults[0]?.action_id ?? "";
-      if (!firstActionId) break;
-
-      const approveResponse = await fetch(
-        `${endpoint}/sessions/${sessionId}/approve`,
-        {
-          method: "POST",
-          headers: headers(apiKey, agent),
-          body: JSON.stringify({
-            action_id: firstActionId,
-            tool_results: toolResults,
-          }),
-        },
-      );
-
-      if (!approveResponse.ok || !approveResponse.body) {
-        const error = await approveResponse.text();
-        yield createTurnCompleted(1, turnId);
-        yield createSessionCompleted();
-        throw new Error(`Cencori Sessions approve error (${approveResponse.status}): ${error}`);
-      }
-
-      // Read resume SSE stream
-      const resumeGen = readTurnSSE(approveResponse, turnId);
-      for await (const event of resumeGen) {
-        yield event;
-      }
-
-      currentInput = result.text;
-      continue;
-    }
-
-    break;
+    response = approveRes;
   }
 
   yield createSessionWaiting();

@@ -21,8 +21,8 @@ showBanner();
 const program = new Command();
 
 program
-  .name("zett")
-  .description("Zett — build agents faster than the speed of light")
+  .name("eline")
+  .description("Eline — the electronic line, build agents at the speed of light")
   .version(version);
 
 program
@@ -43,7 +43,7 @@ program
   .command("build")
   .description("Compile the agent for production")
   .option("--agent-dir <path>", "Path to agent directory", "agent")
-  .option("--out-dir <path>", "Output directory", ".zett")
+  .option("--out-dir <path>", "Output directory", ".eline")
   .action(buildCommand);
 
 program.parse(process.argv);

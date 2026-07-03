@@ -1,10 +1,10 @@
 {
-  "name": "zett",
+  "name": "eline",
   "type": "module",
   "version": "0.1.2",
-  "description": "Build agents faster than the speed of light.",
+  "description": "The electronic line — build agents at the speed of light.",
   "bin": {
-    "zett": "dist/cli/index.js"
+    "eline": "dist/cli/index.js"
   },
   "files": [
     "dist",
@@ -30,7 +30,10 @@
   },
   "typesVersions": {
     "*": {
-      "*": ["./dist/*/index.d.ts", "./dist/index.d.ts"]
+      "*": [
+        "./dist/*/index.d.ts",
+        "./dist/index.d.ts"
+      ]
     }
   },
   "scripts": {
@@ -41,7 +44,7 @@
     "test:watch": "vitest"
   },
   "keywords": [
-    "zett",
+    "eline",
     "ai",
     "agent",
     "framework",
@@ -52,14 +55,15 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cencori/zett.git"
+    "url": "git+https://github.com/cencori/eline.git"
   },
-  "homepage": "https://cencori.com/zett",
+  "homepage": "https://cencori.com/eline",
   "dependencies": {
     "chalk": "^5.3.0",
     "commander": "^12.0.0",
     "ora": "^8.0.1",
-    "zod": "^3.23.0"
+    "zod": "^3.23.0",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

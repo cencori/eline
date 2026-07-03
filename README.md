@@ -1,11 +1,11 @@
-# Zett
+# Eline
 
-Build agents faster than the speed of light.
+The electronic line — build agents at the speed of light.
 
-> Site: [cencori.com/zett](https://cencori.com/zett) &middot; Docs: [cencori.com/zett/docs](https://cencori.com/zett/docs)
+> Site: [cencori.com/eline](https://cencori.com/eline) &middot; Docs: [cencori.com/eline/docs](https://cencori.com/eline/docs)
 
 ```
-npx zett@latest init my-agent
+npx eline@latest init my-agent
 ```
 
 ```
@@ -27,7 +27,7 @@ my-agent/
 ## Quick Start
 
 ```bash
-npx zett@latest init my-agent
+npx eline@latest init my-agent
 cd my-agent
 npm run dev
 ```
@@ -36,7 +36,7 @@ npm run dev
 
 ```ts
 // agent/agent.ts
-import { defineAgent } from "zett";
+import { defineAgent } from "eline";
 
 export default defineAgent({
   model: "claude-sonnet-4-5",
@@ -49,7 +49,7 @@ export default defineAgent({
 
 ```ts
 // agent/tools/get_weather.ts
-import { defineTool } from "zett/tools";
+import { defineTool } from "eline/tools";
 import { z } from "zod";
 
 export default defineTool({

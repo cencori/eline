@@ -1,9 +1,9 @@
-import { defineAgent } from "zett";
+import { defineAgent } from "eline";
 
 export default defineAgent({
   model: "claude-sonnet-4-5",
   name: "my-agent",
-  description: "A Jett agent powered by Cencori.",
+  description: "An Eline agent powered by Cencori.",
   cencori: {
     project: process.env.CENCORI_PROJECT_ID,
     billing: {

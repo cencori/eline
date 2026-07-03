@@ -1,9 +1,9 @@
 export function showBanner(): void {
   console.log();
   console.log("  ╔══════════════════════════════════╗");
-  console.log("  ║         Zett                      ║");
-  console.log("  ║  Build agents faster than the     ║");
-  console.log("  ║  speed of light.                  ║");
+  console.log("  ║         Eline                     ║");
+  console.log("  ║  The electronic line — build      ║");
+  console.log("  ║  agents at the speed of light.    ║");
   console.log("  ╚══════════════════════════════════╝");
   console.log();
 }
