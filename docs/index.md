@@ -1,6 +1,6 @@
-# Jett Documentation
+# Eline Documentation
 
-Jett is a filesystem-first framework for production agents on Cencori.
+Eline is a filesystem-first framework for production agents on Cencori.
 
 ## Getting Started
 
