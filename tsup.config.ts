@@ -23,7 +23,7 @@ export default defineConfig({
   target: "es2022",
   platform: "node",
   outDir: "dist",
-  dts: true,
+  experimentalDts: true,
   sourcemap: true,
   clean: true,
   splitting: true,

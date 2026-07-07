@@ -3,9 +3,6 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    // tsup's .d.ts generator hard-injects the (now TS7-removed) `baseUrl` option;
-    // we don't use baseUrl ourselves. Remove once tsup stops injecting it.
-    "ignoreDeprecations": "6.0",
     "lib": ["ES2022"],
     "outDir": "dist",
     "rootDir": "src",
