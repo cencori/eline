@@ -140,6 +140,17 @@ interface WebChannelHandle {
  * undefined when the channel isn't scaffolded, isn't installed, or fails
  * to start in time.
  */
+async function installWebDeps(webDir: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn("npm", ["install", "--no-fund", "--no-audit"], {
+      cwd: webDir,
+      stdio: "ignore",
+    });
+    child.once("exit", (code) => resolve(code === 0));
+    child.once("error", () => resolve(false));
+  });
+}
+
 async function startWebChannel(
   agentDir: string,
   arcieUrl: string,
@@ -149,11 +160,15 @@ async function startWebChannel(
   if (!existsSync(join(webDir, "package.json"))) return undefined;
 
   if (!existsSync(join(webDir, "node_modules"))) {
-    console.log();
-    console.log(`  ${grey("⚠")} channels/web needs deps installed:`);
-    console.log(`  ${dimmed(`  cd ${webDir} && npm install`)}`);
-    console.log();
-    return undefined;
+    console.log(`  ${dimmed(`web    installing channels/web deps (first run)…`)}`);
+    const installed = await installWebDeps(webDir);
+    if (!installed) {
+      console.log();
+      console.log(`  ${grey("⚠")} channels/web install failed — try manually:`);
+      console.log(`  ${dimmed(`  cd ${webDir} && npm install`)}`);
+      console.log();
+      return undefined;
+    }
   }
 
   const child = spawn("npm", ["run", "dev", "--", "--port", String(webPort)], {
