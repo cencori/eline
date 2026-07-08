@@ -1,7 +1,7 @@
 {
   "name": "arcie",
   "type": "module",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "description": "The electronic line — build agents at the speed of light.",
   "bin": {
     "arcie": "dist/cli/index.js"

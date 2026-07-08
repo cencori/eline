@@ -24,6 +24,14 @@ export interface AgentConfig {
   instructions?: string;
   /** Inline tool map. Primary agents also merge from the sibling `tools/` directory. */
   tools?: Record<string, ToolConfig>;
+  /**
+   * Inline subagents this agent can delegate to. Each entry is itself an
+   * AgentConfig (so subagents recursively support their own tools and
+   * instructions). Primary agents also merge from the sibling
+   * `subagents/<id>/` directory. Every subagent must declare a `description`
+   * so the orchestrator knows when to call it.
+   */
+  subagents?: Record<string, AgentConfig>;
 }
 
 export type ApprovalStrategy = "always" | "never" | "once";

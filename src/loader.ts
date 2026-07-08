@@ -51,7 +51,11 @@ export async function loadAgent(agentDir: string): Promise<LoadedAgent> {
   const channels = await loadDirectory<ChannelConfig>(absDir, "channels");
   const connections = await loadDirectory<ConnectionConfig>(absDir, "connections");
   const schedules = await loadDirectory<ScheduleConfig>(absDir, "schedules");
-  const subagents = await loadSubagents(absDir);
+  const directorySubagents = await loadSubagents(absDir);
+  const inlineSubagents = materializeInlineSubagents(config.subagents);
+  // Directory-based entries win on id collision — they're more explicit and
+  // typically pre-existing.
+  const subagents = { ...inlineSubagents, ...directorySubagents };
   const session = await loadSessionConfig(absDir);
   const policy = await loadPolicyConfig(absDir);
 
@@ -112,9 +116,33 @@ export async function loadInlineAgent(agentDir: string, id: string): Promise<Loa
       channels: {},
       connections: {},
       schedules: {},
-      subagents: {},
+      subagents: materializeInlineSubagents(config.subagents),
     },
   };
+}
+
+/**
+ * Converts an inline `config.subagents` map (from `defineAgent({subagents: {...}})`)
+ * into the `SubagentManifest` shape the runner already handles. Every entry
+ * must declare a description so the orchestrator knows when to delegate.
+ */
+function materializeInlineSubagents(
+  configs: Record<string, AgentConfig> | undefined,
+): Record<string, SubagentManifest> {
+  if (configs === undefined) return {};
+  const result: Record<string, SubagentManifest> = {};
+  for (const [id, subConfig] of Object.entries(configs)) {
+    if (!subConfig.description || subConfig.description.length === 0) {
+      throw new Error(`Inline subagent "${id}" must declare a description`);
+    }
+    result[id] = {
+      config: subConfig,
+      instructions: subConfig.instructions ?? "You are a helpful subagent.",
+      tools: subConfig.tools ?? {},
+      skills: {},
+    };
+  }
+  return result;
 }
 
 /**
