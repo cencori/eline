@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { AgentPicker, type AgentSummary } from "@/components/agent-picker";
 import { InputBar } from "@/components/input-bar";
 import { Message } from "@/components/message";
 import { readArcieStream } from "@/lib/stream";
@@ -11,45 +10,11 @@ function newId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-const AGENT_STORAGE_KEY = "arcie:selected-agent";
-
 export function Chat() {
   const [messages, setMessages] = React.useState<UiMessage[]>([]);
   const [streaming, setStreaming] = React.useState(false);
-  const [agents, setAgents] = React.useState<AgentSummary[]>([]);
-  const [agentId, setAgentId] = React.useState<string>("agent");
   const abortRef = React.useRef<AbortController | undefined>(undefined);
   const containerRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const response = await fetch("/api/agents");
-        if (!response.ok) return;
-        const list = (await response.json()) as AgentSummary[];
-        if (cancelled || !Array.isArray(list)) return;
-        setAgents(list);
-        const stored = typeof window !== "undefined" ? localStorage.getItem(AGENT_STORAGE_KEY) : null;
-        if (stored !== null && list.some((a) => a.id === stored)) {
-          setAgentId(stored);
-        } else if (list.length > 0) {
-          setAgentId(list[0]!.id);
-        }
-      } catch {
-        // Non-fatal — chat still works, just posts to primary.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const changeAgent = (id: string) => {
-    setAgentId(id);
-    if (typeof window !== "undefined") localStorage.setItem(AGENT_STORAGE_KEY, id);
-    clearAll();
-  };
 
   React.useEffect(() => {
     const el = containerRef.current;
@@ -101,7 +66,7 @@ export function Chat() {
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text, agentId }),
+          body: JSON.stringify({ message: text }),
           signal: controller.signal,
         });
         if (!response.ok) {
@@ -210,7 +175,7 @@ export function Chat() {
         abortRef.current = undefined;
       }
     },
-    [messages, agentId],
+    [messages],
   );
 
   const regenerate = () => {
@@ -248,11 +213,6 @@ export function Chat() {
         onClear={clearAll}
         streaming={streaming}
         hasMessages={messages.length > 0}
-        leftSlot={
-          agents.length > 0 ? (
-            <AgentPicker agents={agents} value={agentId} onChange={changeAgent} />
-          ) : undefined
-        }
       />
     </div>
   );
