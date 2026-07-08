@@ -88,28 +88,38 @@ export async function startBlockChat(options: StartBlockChatOptions): Promise<vo
       if (trimmed.startsWith("/")) {
         const command = parsePromptCommand(trimmed);
         if (command === null) {
-          renderer.writeError("Unknown command", `${trimmed} — try /help`);
+          renderer.writeCommandInvocation(trimmed, "error");
+          renderer.writeCommandResult("Unknown command — try /help");
           continue;
         }
+
+        if (command.type === "exit") {
+          renderer.writeCommandInvocation(trimmed);
+          return;
+        }
+
+        renderer.writeCommandInvocation(trimmed);
+
         switch (command.type) {
-          case "exit":
-            return;
           case "help":
-            for (const line of formatPromptCommandHelp().split("\n")) {
-              renderer.writeNotice(line);
-            }
+            renderer.writeCommandResult(formatPromptCommandHelp());
             continue;
           case "clear":
           case "new":
             for (const op of translator.reset()) renderer.apply([op]);
             await commitHeader();
             continue;
-          case "extension":
-            await handleExtension(command, renderer, agentDir, commitHeader);
+          case "extension": {
+            const outcome = await handleExtension(command, agentDir);
+            if (outcome.message.length > 0) renderer.writeCommandResult(outcome.message);
+            if (outcome.refresh) await commitHeader();
             continue;
-          case "loglevel":
-            handleLogLevel(command, renderer, logLevelState);
+          }
+          case "loglevel": {
+            const outcome = handleLogLevel(command, logLevelState);
+            renderer.writeCommandResult(outcome.message);
             continue;
+          }
         }
         continue;
       }
@@ -123,143 +133,139 @@ export async function startBlockChat(options: StartBlockChatOptions): Promise<vo
   }
 }
 
+interface CommandOutcome {
+  readonly message: string;
+  /** When true, the caller re-commits the agent header (model / manifest changed). */
+  readonly refresh?: boolean;
+}
+
 async function handleExtension(
   command: ExtensionCommand,
-  renderer: TerminalRenderer,
   agentDir: string,
-  commitHeader: () => Promise<void>,
-): Promise<void> {
+): Promise<CommandOutcome> {
   const argument = command.argument.trim();
   switch (command.name) {
     case "model":
-      await handleModel(argument, renderer, agentDir, commitHeader);
-      return;
+      return handleModel(argument, agentDir);
     case "provider":
-      handleProvider(renderer, agentDir);
-      return;
+      return handleProvider(agentDir);
     case "channels":
-      handleChannels(argument, renderer, agentDir);
-      return;
+      return handleChannels(argument, agentDir);
     default:
-      renderer.writeNotice(`/${command.name} is not supported here`);
+      return { message: `/${command.name} is not supported here` };
   }
 }
 
-async function handleModel(
-  argument: string,
-  renderer: TerminalRenderer,
-  agentDir: string,
-  commitHeader: () => Promise<void>,
-): Promise<void> {
+function handleModel(argument: string, agentDir: string): CommandOutcome {
   const current = readAgentModel(agentDir);
   if (argument.length === 0) {
-    renderer.writeNotice(
-      current ? `current model: ${current}` : "no model configured in agent/agent.ts",
-    );
-    renderer.writeNotice("change it with: /model <provider/slug>");
-    return;
+    const lines = [
+      current ? `Current model: ${current}` : "No model configured in agent/agent.ts",
+      "Change with: /model <provider/slug>",
+    ];
+    return { message: lines.join("\n") };
   }
   if (current === argument) {
-    renderer.writeNotice(`model is already ${argument}`);
-    return;
+    return { message: `Model is already ${argument}` };
   }
   const changed = writeAgentModel(agentDir, argument);
   if (!changed) {
-    renderer.writeError(
-      "Model not changed",
-      "Could not update agent/agent.ts — file missing or model field not found.",
-    );
-    return;
+    return {
+      message: "Could not update agent/agent.ts — file missing or model field not found.",
+    };
   }
-  renderer.writeNotice(`model set to ${argument}`);
-  await commitHeader();
+  return { message: `Model set to ${argument}`, refresh: true };
 }
 
-function handleProvider(renderer: TerminalRenderer, agentDir: string): void {
+function handleProvider(agentDir: string): CommandOutcome {
   const status = providerKeyStatus(agentDir);
   const configured = status.filter((row) => row.set);
   if (configured.length === 0) {
-    renderer.writeNotice("no provider keys configured");
-    renderer.writeNotice("edit .env.local to add CENCORI_API_KEY or a direct provider key");
-    return;
+    return {
+      message: [
+        "No provider keys configured.",
+        "Edit .env.local to add CENCORI_API_KEY or a direct provider key.",
+      ].join("\n"),
+    };
   }
-  renderer.writeNotice("provider keys:");
+  const lines = ["Provider keys:"];
   for (const row of status) {
     if (row.set) {
-      renderer.writeNotice(`  ${row.key} = ${row.masked} (${row.source})`);
+      lines.push(`  ${row.key} = ${row.masked} (${row.source})`);
     } else {
-      renderer.writeNotice(`  ${row.key} — not set`);
+      lines.push(`  ${row.key} — not set`);
     }
   }
+  return { message: lines.join("\n") };
 }
 
-function handleChannels(
-  argument: string,
-  renderer: TerminalRenderer,
-  agentDir: string,
-): void {
+function handleChannels(argument: string, agentDir: string): CommandOutcome {
   if (argument.length === 0) {
     const channels = listChannels(agentDir);
     if (channels.length === 0) {
-      renderer.writeNotice("no channels scaffolded");
-      renderer.writeNotice("add one with: /channels add web");
-      return;
+      return {
+        message: ["No channels scaffolded.", "Add one with: /channels add web"].join("\n"),
+      };
     }
-    renderer.writeNotice("channels:");
-    for (const channel of channels) renderer.writeNotice(`  ${channel.name} — ${channel.path}`);
-    renderer.writeNotice("add another with: /channels add <kind>");
-    return;
+    const lines = ["Channels:"];
+    for (const channel of channels) lines.push(`  ${channel.name} — ${channel.path}`);
+    lines.push("Add another with: /channels add <kind>");
+    return { message: lines.join("\n") };
   }
 
   const parts = argument.split(/\s+/);
   const subcommand = parts[0];
   const kind = parts[1];
   if (subcommand !== "add") {
-    renderer.writeError("Unknown /channels subcommand", `try: /channels add web`);
-    return;
+    return { message: `Unknown subcommand '${subcommand}' — try: /channels add web` };
   }
   if (kind !== "web") {
-    renderer.writeError("Unsupported channel kind", `${kind ?? "(none)"} — only 'web' is supported`);
-    return;
+    return {
+      message: `Unsupported channel kind '${kind ?? ""}' — only 'web' is supported`,
+    };
   }
   try {
     const result = scaffoldWebChat(agentDir);
     if (result.alreadyExisted) {
-      renderer.writeNotice(`channels/web already exists — left it untouched`);
-      return;
+      return { message: `channels/web already exists at ${result.targetPath}` };
     }
-    renderer.writeNotice(`scaffolded ${result.targetPath}`);
-    renderer.writeNotice("next: cd into it, npm install, npm run dev");
+    return {
+      message: [
+        `Scaffolded ${result.targetPath}`,
+        "Next: cd into it, npm install, npm run dev",
+      ].join("\n"),
+    };
   } catch (err) {
-    renderer.writeError(
-      "Channel scaffold failed",
-      err instanceof Error ? err.message : String(err),
-    );
+    return {
+      message: `Channel scaffold failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
   }
 }
 
 function handleLogLevel(
   command: LoglevelCommand,
-  renderer: TerminalRenderer,
   state: { mode: "all" | "stderr" | "none" },
-): void {
+): CommandOutcome {
   const argument = command.argument.trim();
   if (argument.length === 0) {
-    renderer.writeNotice(`log level: ${state.mode}`);
-    renderer.writeNotice("change with: /loglevel all | stderr | none");
-    renderer.writeNotice("note: arcie does not currently capture subprocess logs.");
-    return;
+    return {
+      message: [
+        `Log level: ${state.mode}`,
+        "Change with: /loglevel all | stderr | none",
+        "Note: arcie does not currently capture subprocess logs.",
+      ].join("\n"),
+    };
   }
   if (!VALID_LOG_MODES.has(argument)) {
-    renderer.writeError(
-      "Invalid log level",
-      `${argument} — pick one of: all, stderr, none`,
-    );
-    return;
+    return { message: `Invalid log level '${argument}' — pick one of: all, stderr, none` };
   }
   state.mode = argument as "all" | "stderr" | "none";
-  renderer.writeNotice(`log level: ${state.mode}`);
-  renderer.writeNotice("note: arcie does not currently capture subprocess logs.");
+  return {
+    message: [
+      `Log level: ${state.mode}`,
+      "Note: arcie does not currently capture subprocess logs.",
+    ].join("\n"),
+  };
 }
 
 async function streamOneTurn(

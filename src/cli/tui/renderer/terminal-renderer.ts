@@ -96,6 +96,26 @@ export class TerminalRenderer {
     this.apply([{ type: "commit", block: { kind: "agent-header", body } }]);
   }
 
+  /**
+   * Echoes a slash-command invocation to scrollback so it chains with the
+   * transcript above (blue `▌ /model`) and the {@link writeCommandResult}
+   * that hangs beneath it can share visual context.
+   */
+  writeCommandInvocation(text: string, status?: "error"): void {
+    const block: Block = { kind: "command", body: text };
+    if (status === "error") block.status = "error";
+    this.apply([{ type: "commit", block }]);
+  }
+
+  /**
+   * Writes a command outcome hung under the previous invocation with the
+   * elbow connector (`⎿  message`). Multi-line messages soft-wrap under the
+   * elbow.
+   */
+  writeCommandResult(text: string): void {
+    this.apply([{ type: "commit", block: { kind: "result", body: text } }]);
+  }
+
   readPrompt(): Promise<string | undefined> {
     return new Promise((resolve) => {
       this.#pendingResolve = resolve;

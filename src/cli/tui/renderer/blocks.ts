@@ -15,6 +15,7 @@ export type BlockKind =
   | "notice"
   | "warning"
   | "result"
+  | "command"
   | "subagent"
   | "subagent-step"
   | "subagent-tool"
@@ -90,6 +91,8 @@ function renderBody(
       return renderWarning(block, width, theme);
     case "result":
       return renderResult(block, width, theme);
+    case "command":
+      return renderCommand(block, theme);
     case "subagent":
       return renderSubagentHeader(block, width, theme);
     case "agent-header":
@@ -299,6 +302,18 @@ function paintCommands(line: string, theme: Theme): string {
   return line.replace(/\/[a-z:-]+/g, (token) =>
     isPromptControlCommand(token) ? theme.colors.blue(token) : token,
   );
+}
+
+/**
+ * A slash-command invocation echoed under the user gutter. Rendered blue
+ * so it's obvious it's a system-directed action, not chat content, but
+ * marked with the same `▌` glyph as user messages so it visually chains
+ * with the transcript. Failed commands (status: "error") get a leading `⨯`.
+ */
+function renderCommand(block: Block, theme: Theme): string[] {
+  const c = theme.colors;
+  const status = block.status === "error" ? `${c.red(theme.glyph.error)} ` : "";
+  return [`${c.cyan(theme.glyph.user)} ${status}${c.blue(block.body ?? "")}`];
 }
 
 function renderResult(block: Block, width: number, theme: Theme): string[] {
