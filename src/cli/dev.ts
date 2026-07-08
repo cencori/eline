@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:http";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { loadAgent } from "../loader";
+import { discoverAgents, loadAgent, loadAgentById } from "../loader";
 import { discoverAgent } from "../discover/index";
 import { streamAgent } from "../runner/index";
 import { showHeader } from "./banner";
@@ -179,42 +179,92 @@ export async function devCommand(options: DevOptions): Promise<void> {
   const agentDirPath = resolve(process.cwd(), options.agentDir);
   const requestedPort = parseInt(options.port, 10);
 
+  const streamTurn = async (
+    res: import("node:http").ServerResponse,
+    body: string,
+    agentId: string | undefined,
+  ) => {
+    try {
+      const { message, stream } = JSON.parse(body);
+      if (typeof message !== "string" || message.length === 0) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "message is required" }));
+        return;
+      }
+      if (stream) {
+        res.writeHead(200, {
+          "Content-Type": "application/x-ndjson",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        });
+        const runOpts = agentId !== undefined ? { agentId } : {};
+        for await (const event of streamAgent(agentDirPath, message, runOpts)) {
+          res.write(JSON.stringify(event) + "\n");
+        }
+        res.end();
+      } else {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        const runOpts = agentId !== undefined ? { agentId } : {};
+        for await (const _event of streamAgent(agentDirPath, message, runOpts)) {}
+        res.end(JSON.stringify({ status: "ok" }));
+      }
+    } catch (err) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: String(err) }));
+    }
+  };
+
+  const listAgents = async () => {
+    const discovered = discoverAgents(agentDirPath);
+    const summaries = await Promise.all(
+      discovered.map(async ({ id }) => {
+        try {
+          const loaded = await loadAgentById(agentDirPath, id);
+          const { config } = loaded.manifest;
+          return {
+            id,
+            name: config.name ?? id,
+            model: config.model,
+            description: config.description ?? "",
+          };
+        } catch {
+          return { id, name: id, model: "", description: "" };
+        }
+      }),
+    );
+    return summaries;
+  };
+
   const server = createServer(async (req, res) => {
-    if (await handleSessionsRequest(req, res)) {
+    if (await handleSessionsRequest(req, res)) return;
+
+    const method = req.method ?? "GET";
+    const url = req.url ?? "/";
+
+    if (method === "GET" && url === "/agents") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(await listAgents()));
       return;
     }
 
-    if (req.method === "POST" && req.url === "/") {
+    const agentsMatch = url.match(/^\/agents\/([^/?]+)(?:\?.*)?$/);
+    if (method === "POST" && agentsMatch !== null) {
       let body = "";
       for await (const chunk of req) body += chunk;
-
-      try {
-        const { message, stream } = JSON.parse(body);
-
-        if (stream) {
-          res.writeHead(200, {
-            "Content-Type": "application/x-ndjson",
-            "Cache-Control": "no-cache",
-            Connection: "keep-alive",
-          });
-
-          for await (const event of streamAgent(agentDirPath, message)) {
-            res.write(JSON.stringify(event) + "\n");
-          }
-          res.end();
-        } else {
-          res.writeHead(200, { "Content-Type": "application/json" });
-          for await (const _event of streamAgent(agentDirPath, message)) {}
-          res.end(JSON.stringify({ status: "ok" }));
-        }
-      } catch (err) {
-        res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: String(err) }));
-      }
-    } else {
-      res.writeHead(404);
-      res.end("Not found");
+      await streamTurn(res, body, decodeURIComponent(agentsMatch[1]!));
+      return;
     }
+
+    if (method === "POST" && url === "/") {
+      let body = "";
+      for await (const chunk of req) body += chunk;
+      // Route bare POST / to the primary agent for backward compatibility.
+      await streamTurn(res, body, undefined);
+      return;
+    }
+
+    res.writeHead(404);
+    res.end("Not found");
   });
 
   let boundPort: number;

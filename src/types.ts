@@ -17,6 +17,13 @@ export interface AgentConfig {
   name?: string;
   description?: string;
   cencori?: CencoriConfig;
+  /**
+   * Inline instructions. Optional; primary agents fall back to
+   * `instructions.md`, inline top-level agents fall back to a default.
+   */
+  instructions?: string;
+  /** Inline tool map. Primary agents also merge from the sibling `tools/` directory. */
+  tools?: Record<string, ToolConfig>;
 }
 
 export type ApprovalStrategy = "always" | "never" | "once";

@@ -11,6 +11,8 @@ interface InputBarProps {
   streaming: boolean;
   disabled?: boolean;
   hasMessages?: boolean;
+  /** Optional slot rendered on the left of the footer bar (e.g. an agent picker). */
+  leftSlot?: React.ReactNode;
 }
 
 export function InputBar({
@@ -20,6 +22,7 @@ export function InputBar({
   streaming,
   disabled,
   hasMessages,
+  leftSlot,
 }: InputBarProps) {
   const [value, setValue] = React.useState("");
   const [files, setFiles] = React.useState<File[]>([]);
@@ -134,6 +137,7 @@ export function InputBar({
               >
                 <Paperclip className="h-4 w-4" />
               </button>
+              {leftSlot}
             </div>
 
             <div className="flex items-center gap-2 shrink-0">

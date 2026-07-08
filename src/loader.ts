@@ -17,7 +17,11 @@ import type {
 export interface LoadedAgent {
   manifest: AgentManifest;
   agentDir: string;
+  /** Stable identifier for this agent within the project. `"agent"` for the primary. */
+  id: string;
 }
+
+export const PRIMARY_AGENT_ID = "agent";
 
 export async function loadAgent(agentDir: string): Promise<LoadedAgent> {
   const absDir = resolve(process.cwd(), agentDir);
@@ -52,6 +56,7 @@ export async function loadAgent(agentDir: string): Promise<LoadedAgent> {
   const policy = await loadPolicyConfig(absDir);
 
   return {
+    id: PRIMARY_AGENT_ID,
     agentDir: absDir,
     manifest: {
       config,
@@ -67,6 +72,59 @@ export async function loadAgent(agentDir: string): Promise<LoadedAgent> {
       policy: policy ?? undefined,
     },
   };
+}
+
+/**
+ * Loads an inline top-level agent — a single `.ts` file at the root of the
+ * agent directory (e.g. `agent/researcher.ts`). Inline agents own their
+ * tools + instructions inside the file's `defineAgent({...})` call; sibling
+ * `tools/`, `subagents/`, `instructions.md` are not traversed. This is the
+ * self-contained path for adding multiple top-level agents without carving
+ * out a directory per one.
+ */
+export async function loadInlineAgent(agentDir: string, id: string): Promise<LoadedAgent> {
+  const absDir = resolve(process.cwd(), agentDir);
+  const filePath = resolve(absDir, `${id}.ts`);
+  if (!existsSync(filePath)) {
+    throw new Error(`Agent not found: ${filePath}`);
+  }
+
+  let mod: { default?: AgentConfig };
+  try {
+    mod = await import(filePath);
+  } catch (err) {
+    throw new Error(`Failed to load ${id}.ts: ${(err as Error).message}`);
+  }
+  const config = mod.default;
+  if (!config) {
+    throw new Error(`${id}.ts must default-export a defineAgent({...}) result`);
+  }
+
+  return {
+    id,
+    agentDir: absDir,
+    manifest: {
+      config,
+      instructions: config.instructions ?? "You are a helpful AI agent.",
+      tools: config.tools ?? {},
+      skills: {},
+      hooks: {},
+      channels: {},
+      connections: {},
+      schedules: {},
+      subagents: {},
+    },
+  };
+}
+
+/**
+ * Dispatches to `loadAgent` for the primary (`agent`) or `loadInlineAgent`
+ * for any additional top-level `.ts` file. Runners and the HTTP server use
+ * this so callers don't need to know the discovery mechanics.
+ */
+export async function loadAgentById(agentDir: string, id: string): Promise<LoadedAgent> {
+  if (id === PRIMARY_AGENT_ID) return loadAgent(agentDir);
+  return loadInlineAgent(agentDir, id);
 }
 
 /**
@@ -118,6 +176,30 @@ async function loadSubagents(
   }
 
   return result;
+}
+
+/**
+ * Discovers every top-level agent under `agentDir`: the primary (`agent.ts`)
+ * plus any sibling `.ts` file at the same depth. Directory-based subagents
+ * (under `subagents/`) are not included here — those belong to the agent
+ * that owns them.
+ */
+export function discoverAgents(agentDir: string): Array<{ id: string; filePath: string }> {
+  const absDir = resolve(process.cwd(), agentDir);
+  if (!existsSync(absDir)) return [];
+  const results: Array<{ id: string; filePath: string }> = [];
+  const primaryPath = resolve(absDir, "agent.ts");
+  if (existsSync(primaryPath)) {
+    results.push({ id: PRIMARY_AGENT_ID, filePath: primaryPath });
+  }
+  for (const entry of readdirSync(absDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    if (entry.name === "agent.ts") continue;
+    if (!entry.name.endsWith(".ts")) continue;
+    const id = entry.name.replace(/\.ts$/, "");
+    results.push({ id, filePath: resolve(absDir, entry.name) });
+  }
+  return results;
 }
 
 function loadInstructionsFile(agentDir: string): string {

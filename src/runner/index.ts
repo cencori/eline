@@ -1,4 +1,4 @@
-import { loadAgent, type LoadedAgent } from "../loader";
+import { loadAgent, loadAgentById, type LoadedAgent } from "../loader";
 import { toModelOutput } from "../tools/index";
 import { Memory } from "../memory/index";
 import type { TurnContext, ToolCallContext, ApprovalStrategy } from "../types";
@@ -20,6 +20,12 @@ export interface RunOptions {
   threadId?: string;
   memoryStore?: import("../memory/index").MemoryStore;
   onEvent?: (event: StreamEvent) => void;
+  /**
+   * Which top-level agent to run. Defaults to `"agent"` (the primary
+   * loaded from `<agentDir>/agent.ts` + siblings). Any other id loads
+   * `<agentDir>/<agentId>.ts` as a self-contained inline agent.
+   */
+  agentId?: string;
 }
 
 export interface RunResult {
@@ -371,7 +377,10 @@ export async function* streamAgent(
   input: string,
   options: RunOptions = {},
 ): AsyncGenerator<StreamEvent, void, unknown> {
-  const agent = await loadAgent(agentDir);
+  const agent =
+    options.agentId !== undefined && options.agentId !== "agent"
+      ? await loadAgentById(agentDir, options.agentId)
+      : await loadAgent(agentDir);
   const endpoint = options.endpoint || process.env.CENCORI_API_URL || DEFAULT_ENDPOINT;
   const apiKey = options.apiKey || process.env.CENCORI_API_KEY || "";
 
