@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowUp, Paperclip, StopCircle, Trash2, X } from "lucide-react";
+import { ArrowUp, Mic, Paperclip, StopCircle, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface InputBarProps {
@@ -13,6 +13,16 @@ interface InputBarProps {
   hasMessages?: boolean;
   /** Optional slot rendered on the left of the footer bar (e.g. an agent picker). */
   leftSlot?: React.ReactNode;
+  /**
+   * Called when the user clicks the microphone. Wire this to your STT
+   * pipeline (browser `SpeechRecognition`, Cencori voice API, etc.). When
+   * omitted, the mic renders as a ghost placeholder that does nothing —
+   * useful for reserving the affordance while voice input is still on the
+   * roadmap.
+   */
+  onMic?(): void;
+  /** True while STT is actively transcribing; renders the mic in an "on" state. */
+  micActive?: boolean;
 }
 
 export function InputBar({
@@ -23,6 +33,8 @@ export function InputBar({
   disabled,
   hasMessages,
   leftSlot,
+  onMic,
+  micActive,
 }: InputBarProps) {
   const [value, setValue] = React.useState("");
   const [files, setFiles] = React.useState<File[]>([]);
@@ -72,9 +84,9 @@ export function InputBar({
       <div className="mx-auto w-full max-w-3xl">
         <div
           className={cn(
-            "relative flex flex-col rounded-2xl border border-border/40 bg-muted/10 backdrop-blur-md p-3 transition-all",
-            "hover:border-border/60 hover:bg-muted/20",
-            "focus-within:border-primary/45 focus-within:ring-1 focus-within:ring-primary/20",
+            "relative flex flex-col rounded-2xl border border-border/15 bg-muted/10 backdrop-blur-md p-3 transition-all",
+            "hover:border-border/25 hover:bg-muted/20",
+            "focus-within:border-border/25 focus-within:ring-1 focus-within:ring-white/5",
           )}
         >
           {files.length > 0 && (
@@ -136,6 +148,28 @@ export function InputBar({
                 title="Attach files"
               >
                 <Paperclip className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={onMic}
+                disabled={streaming || onMic === undefined}
+                className={cn(
+                  "h-8 w-8 flex items-center justify-center rounded-full transition-colors",
+                  micActive
+                    ? "bg-red-500/15 text-red-400 animate-pulse"
+                    : "text-muted-foreground/60 hover:bg-muted/30 hover:text-foreground",
+                  "disabled:cursor-not-allowed disabled:opacity-40",
+                )}
+                aria-label={micActive ? "Stop recording" : "Voice input"}
+                title={
+                  onMic === undefined
+                    ? "Voice input — wire onMic to enable"
+                    : micActive
+                      ? "Stop recording"
+                      : "Voice input"
+                }
+              >
+                <Mic className="h-4 w-4" />
               </button>
               {leftSlot}
             </div>
