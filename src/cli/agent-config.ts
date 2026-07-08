@@ -9,25 +9,45 @@ export function envLocalPath(agentDir: string): string {
   return join(agentDir, ".env.local");
 }
 
+const MODEL_HELPER_PATTERN = /model:\s*cencori\("([^"]+)"\)/;
+const MODEL_STRING_PATTERN = /model:\s*"([^"]+)"/;
+
 export function readAgentModel(agentDir: string): string | undefined {
   const path = agentSourcePath(agentDir);
   if (!existsSync(path)) return undefined;
   try {
     const content = readFileSync(path, "utf-8");
-    return content.match(/model:\s*"([^"]+)"/)?.[1];
+    return content.match(MODEL_HELPER_PATTERN)?.[1] ?? content.match(MODEL_STRING_PATTERN)?.[1];
   } catch {
     return undefined;
   }
 }
 
+/**
+ * Rewrites the `model` field in agent/agent.ts, preserving whichever form
+ * the file already uses (`model: "..."` string vs `model: cencori("...")`
+ * helper). Returns true when the file was actually modified.
+ */
 export function writeAgentModel(agentDir: string, model: string): boolean {
   const path = agentSourcePath(agentDir);
   if (!existsSync(path)) return false;
   const content = readFileSync(path, "utf-8");
-  const updated = content.replace(/model:\s*"[^"]+"/, `model: "${model}"`);
-  if (updated === content) return false;
-  writeFileSync(path, updated);
-  return true;
+
+  if (MODEL_HELPER_PATTERN.test(content)) {
+    const updated = content.replace(MODEL_HELPER_PATTERN, `model: cencori("${model}")`);
+    if (updated === content) return false;
+    writeFileSync(path, updated);
+    return true;
+  }
+
+  if (MODEL_STRING_PATTERN.test(content)) {
+    const updated = content.replace(MODEL_STRING_PATTERN, `model: "${model}"`);
+    if (updated === content) return false;
+    writeFileSync(path, updated);
+    return true;
+  }
+
+  return false;
 }
 
 export const PROVIDER_KEYS = [

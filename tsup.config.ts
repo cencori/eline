@@ -16,6 +16,7 @@ export default defineConfig({
     "runner/index": "src/runner/index.ts",
     "auth/index": "src/auth/index.ts",
     "discover/index": "src/discover/index.ts",
+    "models/index": "src/models/index.ts",
     "protocol/events": "src/protocol/events.ts",
     "cli/index": "src/cli/index.ts",
   },
