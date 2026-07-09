@@ -49,17 +49,33 @@
   * {
     @apply border-border;
   }
+  html {
+    color-scheme: dark;
+    background-color: hsl(var(--background));
+  }
   html,
   body {
     @apply bg-background text-foreground antialiased;
-    min-height: 100%;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
   }
-  /* Hide Next.js dev-mode injected UI (SegmentExplorer, portals, toasts). */
+  /* Hide every Next.js / Turbopack dev-mode injected overlay. Next 15.5's
+     dev overlay renders as a <script data-nextjs-dev-overlay> that takes
+     layout space at the bottom of the viewport when unstyled. */
   nextjs-portal,
+  [data-nextjs-dev-overlay],
   [data-nextjs-toast-wrapper],
   [data-nextjs-dialog-overlay],
   [data-nextjs-scroll-focus-boundary],
-  [data-nextjs-devtools-panel] {
+  [data-nextjs-devtools-panel],
+  [data-nextjs-dialog],
+  [data-nextjs-toast],
+  [data-nextjs-terminal],
+  [data-issues],
+  [class*="__nextjs_"],
+  [class*="__turbopack_"] {
     display: none !important;
   }
 }
