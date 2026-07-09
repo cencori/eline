@@ -64,8 +64,10 @@ async function createChildSession(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      agent_id: `${agent.manifest.config.name ?? "unnamed"}.${subagentId}`,
+      agent_id: null,
       metadata: {
+        parent: agent.manifest.config.name ?? "unnamed",
+        subagent: subagentId,
         model: sub.config.model,
         instructions: sub.instructions,
       },
@@ -166,12 +168,18 @@ async function createSession(
   apiKey: string,
   agent: LoadedAgent,
 ): Promise<string> {
+  // Cencori's `agent_id` is a nullable UUID that links a session to a
+  // Cencori-side registered agent. Arcie is filesystem-first — the
+  // "agent" lives in code, not as a DB row — so we let Cencori
+  // auto-provision the session without a linked agent_id. The agent
+  // name, model, and instructions travel in metadata for observability.
   const res = await fetch(`${endpoint}/sessions`, {
     method: "POST",
     headers: headers(apiKey, agent),
     body: JSON.stringify({
-      agent_id: agent.manifest.config.name,
+      agent_id: null,
       metadata: {
+        name: agent.manifest.config.name,
         model: agent.manifest.config.model,
         instructions: agent.manifest.instructions,
       },
