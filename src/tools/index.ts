@@ -14,19 +14,26 @@ export function defineTool<TInput = unknown, TOutput = unknown>(
 }
 
 export interface ModelToolDefinition {
-  name: string;
-  description: string;
-  input_schema?: Record<string, unknown>;
   type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
 }
 
 export function toModelOutput(name: string, tool: ToolConfig): ModelToolDefinition {
+  // Cencori's Sessions API (and its provider layer) expects OpenAI
+  // chat-completions tool shape: { type, function: { name, description,
+  // parameters } }. A flat { name, input_schema } tool is silently dropped.
   return {
-    name,
-    description: tool.description,
-    input_schema: tool.inputSchema
-      ? (zodToJsonSchema(tool.inputSchema, { target: "openApi3" }) as Record<string, unknown>)
-      : undefined,
     type: "function",
+    function: {
+      name,
+      description: tool.description,
+      parameters: tool.inputSchema
+        ? (zodToJsonSchema(tool.inputSchema, { target: "openApi3" }) as Record<string, unknown>)
+        : { type: "object", properties: {} },
+    },
   };
 }

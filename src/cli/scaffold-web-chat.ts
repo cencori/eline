@@ -16,9 +16,21 @@ function resolveTemplatesDir(): string {
   return resolve(__dirname, "../../templates");
 }
 
+const EXCLUDED_ENTRIES = new Set([
+  "node_modules",
+  ".next",
+  ".vercel",
+  "dist",
+  "build",
+  "out",
+  ".env",
+  ".env.local",
+]);
+
 function collectFiles(dir: string): string[] {
   const results: string[] = [];
   for (const entry of readdirSync(dir)) {
+    if (EXCLUDED_ENTRIES.has(entry)) continue;
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) results.push(...collectFiles(full));
     else results.push(full);

@@ -120,7 +120,7 @@ export function InputBar({
             placeholder={streaming ? "…" : "Ask a question..."}
             disabled={disabled}
             className={cn(
-              "max-h-40 min-h-[48px] w-full resize-none bg-transparent py-1.5 text-xs",
+              "max-h-40 min-h-[48px] w-full resize-none bg-transparent py-1.5 text-sm",
               "placeholder:text-muted-foreground/50 focus:outline-none leading-relaxed",
               "disabled:cursor-not-allowed disabled:opacity-50",
             )}

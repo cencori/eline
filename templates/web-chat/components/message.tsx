@@ -30,7 +30,7 @@ export function Message({ message, isLast, onCopy, onRegenerate }: MessageProps)
     return (
       <div className="flex flex-col px-4 items-end">
         <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-3.5 py-2 text-primary-foreground shadow-sm">
-          <p className="text-xs font-medium leading-relaxed whitespace-pre-wrap">
+          <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">
             {message.content}
           </p>
         </div>
@@ -77,9 +77,9 @@ export function Message({ message, isLast, onCopy, onRegenerate }: MessageProps)
             <div
               className={cn(
                 "prose prose-sm prose-zinc max-w-none dark:prose-invert",
-                "prose-p:my-2 prose-p:leading-relaxed prose-p:text-xs",
-                "prose-pre:my-2 prose-pre:text-xs",
-                "prose-code:text-xs prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none",
+                "prose-p:my-2 prose-p:leading-relaxed prose-p:text-sm",
+                "prose-pre:my-2 prose-pre:text-sm",
+                "prose-code:text-sm prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none",
                 message.errored && "text-destructive",
               )}
             >

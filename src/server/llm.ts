@@ -280,9 +280,9 @@ async function* streamAnthropic(
 
   if (tools && tools.length > 0) {
     body.tools = tools.map((t) => ({
-      name: t.name,
-      description: t.description,
-      input_schema: t.input_schema || { type: "object", properties: {} },
+      name: t.function.name,
+      description: t.function.description,
+      input_schema: t.function.parameters || { type: "object", properties: {} },
     }));
   }
 
@@ -411,9 +411,9 @@ async function* streamGoogle(
   if (tools && tools.length > 0) {
     body.tools = tools.map((t) => ({
       functionDeclarations: [{
-        name: t.name,
-        description: t.description,
-        parameters: t.input_schema || {},
+        name: t.function.name,
+        description: t.function.description,
+        parameters: t.function.parameters || {},
       }],
     }));
   }

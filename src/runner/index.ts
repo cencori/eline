@@ -124,12 +124,9 @@ async function executeSubagent(
   const sub = agent.manifest.subagents[subagentId];
   childSessionId ??= await createChildSession(endpoint, apiKey, agent, subagentId);
   const inputStr = typeof input === "string" ? input : JSON.stringify(input);
-  const tools = Object.entries(sub.tools).map(([name, tool]) => ({
-    name,
-    description: tool.description,
-    input_schema: {},
-    type: "function" as const,
-  }));
+  const tools = Object.entries(sub.tools).map(([name, tool]) =>
+    toModelOutput(name, tool)
+  );
 
   const res = await fetch(`${endpoint}/sessions/${childSessionId}/turns`, {
     method: "POST",
@@ -393,6 +390,17 @@ async function* readTurnSSE(
               textSoFar = finalText;
               yield createMessageCompleted(finalText, finishReason, 1, 0, turnId);
               yield createStepCompleted(finishReason, 1, 0, turnId);
+              yield createTurnCompleted(1, turnId);
+              currentEvent = "";
+              return { status: "completed", text: finalText } as TurnResult;
+            }
+
+            case "turn.failed": {
+              const errRaw = parsed.output?.error;
+              const errMsg = typeof errRaw === "string" ? errRaw : "Turn failed";
+              const finalText = textSoFar.length > 0 ? textSoFar : `Error: ${errMsg}`;
+              yield createMessageCompleted(finalText, "error", 1, 0, turnId);
+              yield createStepCompleted("error", 1, 0, turnId);
               yield createTurnCompleted(1, turnId);
               currentEvent = "";
               return { status: "completed", text: finalText } as TurnResult;

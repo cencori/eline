@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createServer } from "node:http";
-import { existsSync, watch, type FSWatcher } from "node:fs";
+import { existsSync, readFileSync, watch, type FSWatcher } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { discoverAgents, loadAgent, loadAgentById } from "../loader";
 import { discoverAgent } from "../discover/index";
@@ -173,10 +173,15 @@ async function startWebChannel(
 
   // ARCIE_AGENT_DIR points the Next.js /api/chat route at the agent
   // files it should run. streamAgent() is called in-process now — no
-  // proxying, no separate arcie HTTP server.
-  const child = spawn("npm", ["run", "dev", "--", "--port", String(webPort)], {
+  // proxying, no separate arcie HTTP server. PORT lets Next.js pick the
+  // port arcie chose (avoids the parsing quirk with `-- --port`).
+  const child = spawn("npm", ["run", "dev"], {
     cwd: webDir,
-    env: { ...process.env, ARCIE_AGENT_DIR: agentDir },
+    env: {
+      ...process.env,
+      ARCIE_AGENT_DIR: agentDir,
+      PORT: String(webPort),
+    },
     stdio: "ignore",
     detached: false,
   });
@@ -196,6 +201,11 @@ async function startWebChannel(
 export async function devCommand(options: DevOptions): Promise<void> {
   const agentDirPath = resolve(process.cwd(), options.agentDir);
   const requestedPort = parseInt(options.port, 10);
+
+  // Load .env.local from the project root before anything reads env keys.
+  // The user puts CENCORI_API_KEY here; if we don't load it, both this
+  // process and the spawned `next dev` see nothing.
+  loadDotEnv(join(dirname(agentDirPath), ".env.local"));
 
   if (!process.env.CENCORI_API_KEY) process.env.CENCORI_API_KEY = "local-dev-key";
 
@@ -431,5 +441,28 @@ function startAgentWatcher(agentDirPath: string): FSWatcher | undefined {
     });
   } catch {
     return undefined;
+  }
+}
+
+function loadDotEnv(path: string): void {
+  if (!existsSync(path)) return;
+  try {
+    const content = readFileSync(path, "utf-8");
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+      const eq = trimmed.indexOf("=");
+      const key = trimmed.slice(0, eq).trim();
+      let value = trimmed.slice(eq + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      if (key && value && !process.env[key]) process.env[key] = value;
+    }
+  } catch {
+    /* ignore */
   }
 }

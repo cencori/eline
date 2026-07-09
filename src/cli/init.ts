@@ -12,8 +12,6 @@ import { homedir } from "node:os";
 import { resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { exec } from "node:child_process";
-import { fetchModelCatalog, type CatalogModel } from "./model-catalog";
-import { checkProviderKeys, isProviderKeySet, providerEnvVar } from "./tui/diagnostics";
 import { createTuiPrompter } from "./setup/tui-prompter";
 import type { Prompter } from "./setup/prompter";
 import { scaffoldWebChat } from "./scaffold-web-chat";
@@ -73,6 +71,14 @@ function updatePackageJson(dir: string, name: string): void {
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
 }
 
+function updateAgentName(dir: string, name: string): void {
+  const agentPath = join(dir, "agent", "agent.ts");
+  if (!existsSync(agentPath)) return;
+  const content = readFileSync(agentPath, "utf-8");
+  const updated = content.replace(/name:\s*"my-agent"/, `name: "${name}"`);
+  if (updated !== content) writeFileSync(agentPath, updated);
+}
+
 function detectEnvKey(): string | null {
   return process.env.CENCORI_API_KEY ?? null;
 }
@@ -89,13 +95,6 @@ function uncommentEnvLine(envPath: string, key: string, value: string): void {
   });
   if (updated.join("\n") === content) updated.push(`${key}=${value}`);
   writeFileSync(envPath, updated.join("\n") + "\n");
-}
-
-function writeAgentModel(agentDir: string, model: string): void {
-  const agentFile = join(agentDir, "agent/agent.ts");
-  const content = readFileSync(agentFile, "utf-8");
-  const updated = content.replace(/model:\s*"[^"]+"/, `model: "${model}"`);
-  writeFileSync(agentFile, updated);
 }
 
 function runNpmInstall(cwd: string): Promise<void> {
@@ -185,56 +184,6 @@ export async function initCommand(
   }
 }
 
-async function maybeScaffoldWebChat(prompter: Prompter, targetDir: string): Promise<void> {
-  const choice = await prompter.select({
-    message: "Add a web chat UI now? (Next.js + shadcn under channels/web)",
-    options: [
-      { value: "yes", label: "Yes — scaffold channels/web now" },
-      { value: "no", label: "No — I'll add it later with `arcie channels add web`" },
-    ],
-  });
-  if (choice !== "yes") return;
-
-  try {
-    const result = scaffoldWebChat(targetDir);
-    if (result.alreadyExisted) {
-      prompter.log.info(`channels/web already exists — left it untouched`);
-      return;
-    }
-    prompter.log.success(`Scaffolded ${result.targetPath}`);
-    prompter.section("Next steps", [
-      `cd ${result.targetPath.replace(process.cwd() + "/", "")}`,
-      "npm install",
-      "cp .env.local.example .env.local",
-      "npm run dev",
-    ]);
-  } catch (err) {
-    prompter.log.error(err instanceof Error ? err.message : String(err));
-  }
-}
-
-async function maybePromptProviderKey(
-  prompter: Prompter,
-  targetDir: string,
-  modelId: string,
-): Promise<void> {
-  if (process.env.CENCORI_API_KEY) return;
-  const info = providerEnvVar(modelId);
-  if (info === undefined) return;
-  if (isProviderKeySet(targetDir, info.envVar)) return;
-
-  const key = await prompter.text({
-    message: `Paste your ${info.envVar} for ${info.provider} (optional — skip with Enter)`,
-    mask: true,
-  });
-  if (key === undefined || key.length === 0) return;
-
-  const envPath = join(targetDir, ".env.local");
-  uncommentEnvLine(envPath, info.envVar, key);
-  process.env[info.envVar] = key;
-  prompter.log.success(`Wrote ${info.envVar} to .env.local`);
-}
-
 type InitMode = "fresh" | "resume";
 type ExistingDirectoryDecision = "overwrite" | "resume" | "cancel";
 
@@ -281,83 +230,95 @@ async function runInit(
 
   const needsScaffold = mode === "fresh" || !looksLikeArcieProject(targetDir);
   if (needsScaffold) {
-    const scaffold = prompter.spinner(`Creating agent in ${targetDir}`);
+    const scaffold = prompter.spinner(`Creating ${targetDir}`);
     copyTemplate(templateDir, targetDir);
-    if (name) updatePackageJson(targetDir, name);
-    scaffold.stop({ kind: "success", message: `Created agent in ${targetDir}` });
-  } else {
-    prompter.log.info(`Resuming setup for ${targetDir}`);
+    if (name) {
+      updatePackageJson(targetDir, name);
+      updateAgentName(targetDir, name);
+    }
+    scaffold.stop({ kind: "success", message: `Created ${targetDir}` });
   }
 
-  const nodeModules = join(targetDir, "node_modules");
-  if (existsSync(nodeModules)) {
-    prompter.log.info("Dependencies already installed");
-  } else {
+  // Always scaffold the web channel — it's the default UI users chat with.
+  try {
+    scaffoldWebChat(targetDir);
+  } catch (err) {
+    prompter.log.error(`Failed to scaffold web channel: ${err instanceof Error ? err.message : String(err)}`);
+    return;
+  }
+
+  // Install root deps.
+  if (!existsSync(join(targetDir, "node_modules"))) {
     const install = prompter.spinner("Installing dependencies");
     try {
       await runNpmInstall(targetDir);
       install.stop({ kind: "success", message: "Installed dependencies" });
     } catch {
-      install.stop({ kind: "warning", message: "Dependency install skipped" });
+      install.stop({ kind: "warning", message: "Root install failed — run `npm install` manually" });
+      return;
     }
   }
 
+  // Install web-chat deps too (Next.js, arcie for the /api/chat route, etc.).
+  const webDir = join(targetDir, "channels", "web");
+  if (!existsSync(join(webDir, "node_modules"))) {
+    const webInstall = prompter.spinner("Installing web dependencies");
+    try {
+      await runNpmInstall(webDir);
+      webInstall.stop({ kind: "success", message: "Installed web dependencies" });
+    } catch {
+      webInstall.stop({
+        kind: "warning",
+        message: "Web install failed — `arcie dev` will retry on start",
+      });
+    }
+  }
+
+  // Optional API key. Skip freely — dev still starts, first message
+  // will error with a friendly "add CENCORI_API_KEY to .env.local".
   if (detectEnvKey() === null) {
     const key = await prompter.text({
-      message: "Paste your CENCORI_API_KEY (optional — skip with Enter)",
+      message: "Paste your CENCORI_API_KEY (or Enter to skip and add later)",
       mask: true,
     });
     if (key !== undefined && key.length > 0) {
       uncommentEnvLine(join(targetDir, ".env.local"), "CENCORI_API_KEY", key);
       process.env.CENCORI_API_KEY = key;
       prompter.log.success("Wrote CENCORI_API_KEY to .env.local");
+    } else {
+      prompter.log.info(`Add later: echo 'CENCORI_API_KEY=...' >> ${join(targetDir, ".env.local")}`);
     }
   }
 
-  const catalogSpinner = prompter.spinner("Loading model catalog");
-  const catalog = await fetchModelCatalog();
-  catalogSpinner.stop();
+  // Load .env.local so devCommand starts with the vars already in process.env.
+  loadEnvFile(join(targetDir, ".env.local"));
 
-  const modelId = await prompter.searchableSelect({
-    message: "What model would you like to use?",
-    placeholder: "type to filter…",
-    options: catalog.map((model: CatalogModel) => ({
-      value: model.id,
-      label: model.name,
-      description: model.provider,
-    })),
-  });
-  if (modelId === undefined) return;
-  writeAgentModel(targetDir, modelId);
-  prompter.log.success(`Set model to ${modelId}`);
-
-  await maybePromptProviderKey(prompter, targetDir, modelId);
-
-  const diagnostics = checkProviderKeys(targetDir, modelId);
-  if (diagnostics.length > 0) {
-    prompter.section(
-      "Checks",
-      diagnostics.map(
-        (d) => `${d.severity === "info" ? "✓" : "⚠"} ${d.message}${d.fix ? ` — ${d.fix}` : ""}`,
-      ),
-    );
-  }
-
-  await maybeScaffoldWebChat(prompter, targetDir);
-
-  const start = await prompter.select({
-    message: "Start dev server now?",
-    options: [
-      { value: "yes", label: "Yes — arcie dev + web UI, browser opens" },
-      { value: "no", label: `No — later: cd ${name ?? "."} && arcie dev` },
-    ],
-  });
-  if (start !== "yes") {
-    prompter.log.info(`later: cd ${name ?? "."} && arcie dev`);
-    return;
-  }
+  prompter.stop();
+  console.log();
 
   const { devCommand } = await import("./dev");
-  prompter.stop();
-  await devCommand({ port: "3000", agentDir: targetDir, input: false });
+  await devCommand({
+    // devCommand infers project root as dirname(agentDir), so pass the
+    // agent/ subdir — not the project root.
+    agentDir: join(targetDir, "agent"),
+    port: "3000",
+    input: false,
+  });
+}
+
+function loadEnvFile(path: string): void {
+  if (!existsSync(path)) return;
+  try {
+    const content = readFileSync(path, "utf-8");
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+      const eq = trimmed.indexOf("=");
+      const key = trimmed.slice(0, eq).trim();
+      const value = trimmed.slice(eq + 1).trim();
+      if (key && value && !process.env[key]) process.env[key] = value;
+    }
+  } catch {
+    /* ignore */
+  }
 }
