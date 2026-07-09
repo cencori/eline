@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve as resolvePath } from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadAgent, loadAgentById, type LoadedAgent } from "../loader";
 import { toModelOutput } from "../tools/index";
 import { Memory } from "../memory/index";
@@ -10,6 +13,35 @@ import {
   createSubagentCalled, createSubagentCompleted,
   type StreamEvent,
 } from "../protocol/events";
+
+/**
+ * Reads arcie's own package.json at runtime to emit the real installed
+ * version in session.started events. Walks up from the compiled file's
+ * location because tsup's chunk layout puts the module at various
+ * dist depths depending on splitting decisions.
+ */
+function readArcieVersion(): string {
+  try {
+    const start = dirname(fileURLToPath(import.meta.url));
+    let current = start;
+    for (let i = 0; i < 8; i += 1) {
+      try {
+        const pkg = JSON.parse(readFileSync(resolvePath(current, "package.json"), "utf-8"));
+        if (pkg.name === "arcie" && typeof pkg.version === "string") return pkg.version;
+      } catch {
+        /* keep walking */
+      }
+      const parent = dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+  } catch {
+    /* fall through */
+  }
+  return "unknown";
+}
+
+const ARCIE_VERSION = readArcieVersion();
 
 export interface RunOptions {
   endpoint?: string;
@@ -431,7 +463,7 @@ export async function* streamAgent(
   yield createSessionStarted(sessionId, {
     agentId: agent.manifest.config.name ?? "unnamed",
     modelId: model,
-    arcieVersion: "0.1.2",
+    arcieVersion: ARCIE_VERSION,
   });
 
   const turnId = crypto.randomUUID();
