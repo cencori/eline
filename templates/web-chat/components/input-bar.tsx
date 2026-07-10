@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowUp, Mic, Paperclip, StopCircle, Trash2, X } from "lucide-react";
+import { ArrowUp, Mic, Paperclip, Square, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface InputBarProps {
@@ -117,7 +117,7 @@ export function InputBar({
             onChange={onChange}
             onKeyDown={onKeyDown}
             rows={2}
-            placeholder={streaming ? "…" : "Ask a question..."}
+            placeholder="Ask a question..."
             disabled={disabled}
             className={cn(
               "max-h-40 min-h-[48px] w-full resize-none bg-transparent py-1.5 text-sm",
@@ -193,7 +193,7 @@ export function InputBar({
                   className="h-8 w-8 flex items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90 transition-colors"
                   aria-label="Stop generation"
                 >
-                  <StopCircle className="h-3.5 w-3.5 fill-current" />
+                  <Square className="h-3 w-3 fill-current" />
                 </button>
               ) : (
                 <button
