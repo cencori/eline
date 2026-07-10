@@ -42,6 +42,7 @@ const PROVIDERS: Record<string, ProviderConfig> = {
  * working against direct provider APIs, not just Cencori.
  */
 const BARE_MODEL_PROVIDERS: Array<[RegExp, string]> = [
+  [/^gpt-oss/, "groq"], // open-weight gpt-oss models are hosted by Groq, not OpenAI
   [/^(gpt-|o[0-9])/, "openai"],
   [/^claude-/, "anthropic"],
   [/^gemini-/, "google"],

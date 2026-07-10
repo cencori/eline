@@ -79,24 +79,40 @@ async function listenWithFallback(
   );
 }
 
-function isPortFree(port: number): Promise<boolean> {
+function isPortFree(port: number, host?: string): Promise<boolean> {
   return new Promise((resolve) => {
     const probe = createServer();
     probe.once("error", () => resolve(false));
     probe.once("listening", () => {
       probe.close(() => resolve(true));
     });
-    probe.listen(port);
+    if (host) probe.listen(port, host);
+    else probe.listen(port);
   });
 }
 
-async function findFreePort(startPort: number, maxAttempts = MAX_PORT_ATTEMPTS): Promise<number> {
+async function findFreePort(startPort: number, maxAttempts = MAX_PORT_ATTEMPTS, host?: string): Promise<number> {
   for (let offset = 0; offset < maxAttempts; offset += 1) {
     const port = startPort + offset;
-    if (await isPortFree(port)) return port;
+    // A wildcard bind can succeed while 127.0.0.1 is separately taken
+    // (and vice versa), so a port only counts as free when both are —
+    // otherwise "localhost" in the browser can resolve to a different
+    // server than the one we started.
+    const free = host
+      ? await isPortFree(port, host)
+      : (await isPortFree(port)) && (await isPortFree(port, "127.0.0.1"));
+    if (free) return port;
   }
   throw new Error(`No free port in ${startPort}..${startPort + maxAttempts - 1}`);
 }
+
+/**
+ * The local engine's gateway lives well away from the 3000-range that
+ * Next.js walks when its preferred port is taken — otherwise the
+ * gateway can occupy the exact port Next falls back to (or vice versa)
+ * and the browser lands on the wrong server.
+ */
+const LOCAL_GATEWAY_BASE_PORT = 41100;
 
 function openBrowser(url: string): void {
   const command =
@@ -173,20 +189,33 @@ async function startWebChannel(
 
   // ARCIE_AGENT_DIR points the Next.js /api/chat route at the agent
   // files it should run. streamAgent() is called in-process now — no
-  // proxying, no separate arcie HTTP server. PORT lets Next.js pick the
-  // port arcie chose (avoids the parsing quirk with `-- --port`).
+  // proxying, no separate arcie HTTP server. PORT is a hint: Next.js
+  // owns port selection (it falls back on conflicts itself), so we read
+  // the URL it actually bound from its output rather than probing and
+  // second-guessing it.
+  // Explicit ports make Next.js hard-fail when taken, so hint with a
+  // port that's actually free; the reported URL is still authoritative.
+  let portHint = webPort;
+  if (!(await isPortFree(webPort)) || !(await isPortFree(webPort, "127.0.0.1"))) {
+    try {
+      portHint = await findFreePort(webPort + 1);
+    } catch {
+      /* let Next.js report the conflict itself */
+    }
+  }
+
   const child = spawn("npm", ["run", "dev"], {
     cwd: webDir,
     env: {
       ...process.env,
       ARCIE_AGENT_DIR: agentDir,
-      PORT: String(webPort),
+      PORT: String(portHint),
     },
-    stdio: "ignore",
+    stdio: ["ignore", "pipe", "pipe"],
     detached: false,
   });
 
-  const url = `http://localhost:${webPort}`;
+  const url = (await readNextLocalUrl(child, 45_000)) ?? `http://localhost:${portHint}`;
   const ready = await waitForHttp(url, 45_000);
   if (!ready) {
     console.log();
@@ -196,6 +225,36 @@ async function startWebChannel(
   }
 
   return { url, process: child };
+}
+
+/**
+ * Watches the spawned dev server's output for the "Local: http://…"
+ * line Next.js prints once it has bound a port. Returns undefined if
+ * the line never shows (unusual output format) — callers fall back to
+ * the requested port.
+ */
+function readNextLocalUrl(child: ChildProcess, timeoutMs: number): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    let buffer = "";
+    let settled = false;
+    const finish = (url?: string) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.stdout?.removeListener("data", onData);
+      child.stderr?.removeListener("data", onData);
+      resolve(url);
+    };
+    const timer = setTimeout(() => finish(undefined), timeoutMs);
+    const onData = (chunk: Buffer) => {
+      buffer += chunk.toString();
+      const match = buffer.match(/Local:\s+(https?:\/\/\S+)/);
+      if (match) finish(match[1]!.replace(/\/+$/, ""));
+    };
+    child.stdout?.on("data", onData);
+    child.stderr?.on("data", onData);
+    child.once("exit", () => finish(undefined));
+  });
 }
 
 export async function devCommand(options: DevOptions): Promise<void> {
@@ -239,18 +298,9 @@ export async function devCommand(options: DevOptions): Promise<void> {
 
   // ── Web-attached mode: one process, one port. Next.js owns /api/chat
   //    and calls streamAgent() in-process. No proxy, no separate arcie HTTP.
+  //    Next.js also owns web port selection — the requested port is a hint,
+  //    and we report whatever it actually bound.
   if (wantsWeb) {
-    let webPort: number;
-    try {
-      webPort = await findFreePort(requestedPort);
-    } catch (err) {
-      console.error(`  ${grey("✗")} ${err instanceof Error ? err.message : String(err)}`);
-      process.exit(1);
-    }
-    if (webPort !== requestedPort) {
-      console.log(`  ${grey("!")} port ${requestedPort} was in use ${grey("\xB7")} using ${webPort}`);
-      console.log();
-    }
     // ── Engine selection: run the agent loop against the local engine
     //    (direct provider calls, in-memory sessions) whenever a provider
     //    key exists for the agent's model. The Cencori cloud gateway is
@@ -266,7 +316,7 @@ export async function devCommand(options: DevOptions): Promise<void> {
           res.end();
         });
         try {
-          const gatewayPort = await findFreePort(webPort + 1);
+          const gatewayPort = await findFreePort(LOCAL_GATEWAY_BASE_PORT, MAX_PORT_ATTEMPTS, "127.0.0.1");
           await new Promise<void>((resolveListen, rejectListen) => {
             gateway.once("error", rejectListen);
             gateway.listen(gatewayPort, "127.0.0.1", resolveListen);
@@ -282,14 +332,18 @@ export async function devCommand(options: DevOptions): Promise<void> {
     }
     console.log(`  ${dimmed(`engine ${engineLabel}`)}`);
 
-    console.log(`  ${dimmed(`starting on http://localhost:${webPort}…`)}`);
-    const webChannel = await startWebChannel(agentDirPath, webPort);
+    console.log(`  ${dimmed(`starting on http://localhost:${requestedPort}…`)}`);
+    const webChannel = await startWebChannel(agentDirPath, requestedPort);
     if (webChannel === undefined) {
       console.log(`  ${grey("⚠")} web channel failed to start`);
       process.exit(1);
     }
-    console.log(`  ${dimmed(`web    http://localhost:${webPort}`)}`);
-    console.log(`  ${dimmed(`api    http://localhost:${webPort}/api/chat`)}`);
+    const boundPortMatch = webChannel.url.match(/:(\d+)$/);
+    if (boundPortMatch && boundPortMatch[1] !== String(requestedPort)) {
+      console.log(`  ${grey("!")} port ${requestedPort} was in use ${grey("\xB7")} next chose ${boundPortMatch[1]}`);
+    }
+    console.log(`  ${dimmed(`web    ${webChannel.url}`)}`);
+    console.log(`  ${dimmed(`api    ${webChannel.url}/api/chat`)}`);
     if (missingKeys.length > 0) {
       console.log();
       console.log(`  ${grey("⚠")} Missing API keys: ${missingKeys.join(", ")}`);
