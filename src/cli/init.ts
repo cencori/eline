@@ -71,6 +71,38 @@ function updatePackageJson(dir: string, name: string): void {
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
 }
 
+/** The version of the arcie package this CLI is running from. */
+function readCliVersion(): string {
+  try {
+    const pkg = JSON.parse(readFileSync(join(dirname(TEMPLATES_DIR), "package.json"), "utf-8"));
+    if (pkg.name === "arcie" && typeof pkg.version === "string") return pkg.version;
+  } catch {
+    /* fall through */
+  }
+  return "";
+}
+
+/**
+ * Stamps the CLI's own version into a scaffolded package.json's arcie
+ * dependency. Template files carry a hand-written pin that inevitably
+ * rots (we shipped ^0.1.2 for months); pinning to the CLI that created
+ * the project guarantees new projects start on the runtime the CLI was
+ * built and tested with.
+ */
+function pinArcieDependency(pkgPath: string): void {
+  const version = readCliVersion();
+  if (version === "" || !existsSync(pkgPath)) return;
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+    if (pkg.dependencies?.arcie) {
+      pkg.dependencies.arcie = `^${version}`;
+      writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+    }
+  } catch {
+    /* leave the template pin in place */
+  }
+}
+
 function updateAgentName(dir: string, name: string): void {
   const agentPath = join(dir, "agent", "agent.ts");
   if (!existsSync(agentPath)) return;
@@ -236,12 +268,16 @@ async function runInit(
       updatePackageJson(targetDir, name);
       updateAgentName(targetDir, name);
     }
+    pinArcieDependency(join(targetDir, "package.json"));
     scaffold.stop({ kind: "success", message: `Created ${targetDir}` });
   }
 
   // Always scaffold the web channel — it's the default UI users chat with.
   try {
-    scaffoldWebChat(targetDir);
+    const webChat = scaffoldWebChat(targetDir);
+    if (!webChat.alreadyExisted) {
+      pinArcieDependency(join(webChat.targetPath, "package.json"));
+    }
   } catch (err) {
     prompter.log.error(`Failed to scaffold web channel: ${err instanceof Error ? err.message : String(err)}`);
     return;
