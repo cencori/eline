@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
   const runOpts = {
     hotReload: true,
     memoryStore,
+    workingMemoryDir: resolve(AGENT_DIR, "sessions"),
     resourceId: "web",
     ...(typeof agentId === "string" && agentId.length > 0 ? { agentId } : {}),
     ...(typeof sessionId === "string" && sessionId.length > 0 ? { sessionId } : {}),

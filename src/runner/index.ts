@@ -119,6 +119,9 @@ export interface RunOptions {
   resourceId?: string;
   threadId?: string;
   memoryStore?: import("../memory/index").MemoryStore;
+  /** Directory for working memory .md files (sessions/). When set, working
+   *  memory is stored as editable markdown instead of in the memory store. */
+  workingMemoryDir?: string;
   onEvent?: (event: StreamEvent) => void;
   /**
    * Which top-level agent to run. Defaults to `"agent"` (the primary
@@ -686,6 +689,7 @@ export async function* streamLoadedAgent(
         store: options.memoryStore,
         resourceId: options.resourceId,
         threadId: options.threadId,
+        workingMemoryDir: options.workingMemoryDir,
       })
     : null;
   const memoryTools = memory ? memory.getToolDefinitions() : {};

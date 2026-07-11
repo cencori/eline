@@ -38,6 +38,9 @@ export interface MemoryOptions {
   vectorStore?: import("./types").VectorStore;
   lastMessages?: number;
   readOnly?: boolean;
+  /** When set, working memory is stored as a .md file in this directory
+   *  instead of in the memory store. */
+  workingMemoryDir?: string;
 }
 
 interface BuildConfig {
@@ -142,6 +145,7 @@ export class Memory {
         enabled: true,
         template: config.workingMemoryTemplate,
         scope: "resource",
+        dir: opts.workingMemoryDir,
       }));
     }
   }

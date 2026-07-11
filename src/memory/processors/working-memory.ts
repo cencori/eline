@@ -1,3 +1,5 @@
+import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
 import { z } from "zod";
 import type { MemoryStore, MemoryProcessor } from "../types";
 import type { ToolConfig } from "../../types";
@@ -30,6 +32,9 @@ export interface WorkingMemoryConfig {
   template?: string;
   schema?: z.ZodType<any>;
   scope?: "thread" | "resource";
+  /** Directory to store the working memory .md file. When set, uses file-based
+   *  storage instead of the memory store. */
+  dir?: string;
 }
 
 type WmMode = { type: "template"; template: string } | { type: "schema"; schema: z.ZodType<any> };
@@ -88,12 +93,28 @@ export class WorkingMemoryProcessor implements MemoryProcessor {
     return this.config.scope === "resource" ? this.resourceId : this.threadId;
   }
 
+  private filePath(): string | null {
+    if (!this.config.dir) return null;
+    return resolve(this.config.dir, `${this.key()}.md`);
+  }
+
   private defaultContent(): string {
     if (this.mode.type === "template") return this.mode.template;
     return JSON.stringify(this.mode.schema.parse({}), null, 2);
   }
 
+  private ensureDir(path: string): void {
+    mkdirSync(dirname(path), { recursive: true });
+  }
+
   async loadContent(): Promise<string> {
+    const fp = this.filePath();
+    if (fp) {
+      if (existsSync(fp)) {
+        return readFileSync(fp, "utf-8");
+      }
+      return this.defaultContent();
+    }
     const k = this.key();
     const entries = await this.store.load(k, WORKING_MEMORY_KEY);
     if (entries.length === 0) return this.defaultContent();
@@ -101,11 +122,26 @@ export class WorkingMemoryProcessor implements MemoryProcessor {
     return wm?.content ?? this.defaultContent();
   }
 
+  private async saveContent(content: string): Promise<void> {
+    const fp = this.filePath();
+    if (fp) {
+      this.ensureDir(fp);
+      writeFileSync(fp, content, "utf-8");
+      return;
+    }
+    const k = this.key();
+    await this.store.save(k, WORKING_MEMORY_KEY, [
+      { role: "system", content, timestamp: Date.now() },
+    ]);
+  }
+
   async processInput(_store: MemoryStore, _resourceId: string, _threadId: string): Promise<string> {
     if (!this.config.enabled) return "";
     this.currentContent = await this.loadContent();
     if (!this.currentContent || this.currentContent === this.defaultContent()) return "";
-    const label = this.mode.type === "schema" ? "## Working Memory\n\n```json" : "## Working Memory";
+    const fp = this.filePath();
+    const editHint = fp ? ` (edit ${fp} directly)` : "";
+    const label = this.mode.type === "schema" ? `## Working Memory${editHint}\n\n\`\`\`json` : `## Working Memory${editHint}`;
     const suffix = this.mode.type === "schema" ? "```" : "";
     return `${label}\n${this.currentContent}${suffix ? `\n${suffix}` : ""}`;
   }
@@ -141,7 +177,6 @@ export class WorkingMemoryProcessor implements MemoryProcessor {
           }),
           execute: async (input: unknown) => {
             const { updates } = input as { updates: Record<string, unknown> };
-            const k = self.key();
             const raw = await self.loadContent();
             let current: Record<string, unknown>;
             try {
@@ -151,9 +186,7 @@ export class WorkingMemoryProcessor implements MemoryProcessor {
             }
             const merged = deepMerge(current, updates);
             const content = JSON.stringify(merged, null, 2);
-            await self.store.save(k, WORKING_MEMORY_KEY, [
-              { role: "system", content, timestamp: Date.now() },
-            ]);
+            await self.saveContent(content);
             return { updated: true };
           },
         },
@@ -171,10 +204,7 @@ export class WorkingMemoryProcessor implements MemoryProcessor {
         inputSchema: updateWmSchema,
         execute: async (input: unknown) => {
           const { content } = input as { content: string };
-          const k = self.key();
-          await self.store.save(k, WORKING_MEMORY_KEY, [
-            { role: "system", content, timestamp: Date.now() },
-          ]);
+          await self.saveContent(content);
           return { updated: true };
         },
       },
