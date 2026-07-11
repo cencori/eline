@@ -106,7 +106,7 @@ function createCliProgram(logger: CliLogger): Command {
       try {
         const result = scaffoldWebChat(agentDir);
         if (result.alreadyExisted) {
-          logger.error(`channels/web already exists at ${result.targetPath}`);
+          logger.error(`web already exists at ${result.targetPath}`);
           process.exit(1);
         }
         logger.log(
@@ -192,7 +192,7 @@ function createCliProgram(logger: CliLogger): Command {
       parseContextSizeOption,
     )
     .option("--logs <mode>", "Which logs to show: all | stderr | none", parseLogsMode)
-    .option("--no-web", "Do not auto-start the channels/web/ dev server")
+    .option("--no-web", "Do not auto-start the web/ dev server")
     .option("--no-open", "Do not auto-open the browser at the web channel URL")
     .action(async (options) => {
       const { devCommand } = await import("./dev");

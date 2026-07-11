@@ -14,7 +14,7 @@ export interface DevOptions {
   port: string;
   agentDir: string;
   input?: boolean;
-  /** Skip auto-starting the channels/web/ dev server even when it exists. */
+  /** Skip auto-starting the web/ dev server even when it exists. */
   noWeb?: boolean;
   /** Skip auto-opening the browser at the web channel URL. */
   noOpen?: boolean;
@@ -239,10 +239,10 @@ interface WebChannelHandle {
 }
 
 /**
- * Spawns the channels/web/ dev server as a child process, waits for it to
- * come up, and returns a handle the caller can kill on shutdown. Returns
- * undefined when the channel isn't scaffolded, isn't installed, or fails
- * to start in time.
+ * Spawns the web/ dev server as a child process, waits for it to come up,
+ * and returns a handle the caller can kill on shutdown. Returns undefined
+ * when the directory isn't scaffolded, isn't installed, or fails to start
+ * in time.
  */
 async function installWebDeps(webDir: string): Promise<boolean> {
   return new Promise((resolve) => {
@@ -260,15 +260,15 @@ async function startWebChannel(
   webPort: number,
 ): Promise<WebChannelHandle | undefined> {
   const projectRoot = dirname(agentDir);
-  const webDir = join(projectRoot, "channels", "web");
+  const webDir = join(projectRoot, "web");
   if (!existsSync(join(webDir, "package.json"))) return undefined;
 
   if (!existsSync(join(webDir, "node_modules"))) {
-    console.log(`  ${dimmed(`web    installing channels/web deps (first run)…`)}`);
+      console.log(`  ${dimmed(`web    installing deps (first run)…`)}`);
     const installed = await installWebDeps(webDir);
     if (!installed) {
       console.log();
-      console.log(`  ${grey("⚠")} channels/web install failed — try manually:`);
+      console.log(`  ${grey("⚠")} web install failed — try manually:`);
       console.log(`  ${dimmed(`  cd ${webDir} && npm install`)}`);
       console.log();
       return undefined;
@@ -307,7 +307,7 @@ async function startWebChannel(
   const ready = await waitForHttp(url, 45_000);
   if (!ready) {
     console.log();
-    console.log(`  ${grey("⚠")} channels/web didn't come up within 45s`);
+    console.log(`  ${grey("⚠")} web didn't come up within 45s`);
     child.kill();
     return undefined;
   }
@@ -380,7 +380,7 @@ export async function devCommand(options: DevOptions): Promise<void> {
   console.log();
 
   const projectRoot = dirname(agentDirPath);
-  const webDir = join(projectRoot, "channels", "web");
+  const webDir = join(projectRoot, "web");
   const hasWeb = existsSync(webDir);
   const wantsWeb = !options.input && options.noWeb !== true && hasWeb;
 
@@ -442,7 +442,7 @@ export async function devCommand(options: DevOptions): Promise<void> {
     return;
   }
 
-  // ── JSON-only mode: no channels/web/. Standalone HTTP server for
+  // ── JSON-only mode: no web/. Standalone HTTP server for
   //    curl users, tests, and other connectors that hit the agent
   //    directly (Slack, WhatsApp bots, etc. down the line).
   const streamTurn = async (

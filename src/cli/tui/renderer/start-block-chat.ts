@@ -227,7 +227,7 @@ function handleChannels(argument: string, agentDir: string): CommandOutcome {
   try {
     const result = scaffoldWebChat(agentDir);
     if (result.alreadyExisted) {
-      return { message: `channels/web already exists at ${result.targetPath}` };
+      return { message: `web already exists at ${result.targetPath}` };
     }
     return {
       message: [

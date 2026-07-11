@@ -59,13 +59,13 @@ export interface ScaffoldWebChatResult {
 }
 
 /**
- * Copies the web-chat template into `<agentDir>/channels/web`. If the target
- * already exists, leaves it untouched and reports so callers can decide
- * whether to prompt for overwrite.
+ * Copies the web-chat template into `<agentDir>/web`. If the target already
+ * exists, leaves it untouched and reports so callers can decide whether to
+ * prompt for overwrite.
  */
 export function scaffoldWebChat(agentDir: string): ScaffoldWebChatResult {
   const source = resolve(resolveTemplatesDir(), "web-chat");
-  const target = join(agentDir, "channels", "web");
+  const target = join(agentDir, "web");
   if (existsSync(target)) {
     return { targetPath: target, alreadyExisted: true };
   }

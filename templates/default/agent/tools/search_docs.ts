@@ -10,7 +10,7 @@ const DOCS_ENTRIES: Record<string, string> = {
   "defineConnection": "`defineConnection(config)` creates an OAuth2/API key/basic auth connection for external services.",
   "memory": "Arcie supports memory via `sessions/config.ts`. Strategies: `lastN` (keeps last N turns), `summary` (summarizes old turns), `keyFacts` (extracts key facts), `semantic` (vector recall).",
   "subagents": "Subagents are self-contained child agents in `subagents/<name>/`. Each has its own `agent.ts`, `instructions.md`, and `tools/`. The parent delegates tasks via tool call.",
-  "arcie dev": "`arcie dev` starts a local dev server with hot reload. It auto-starts `channels/web/` if scaffolded. Uses Cencori cloud by default, falls back to local provider keys.",
+  "arcie dev": "`arcie dev` starts a local dev server with hot reload. It auto-starts `web/` if scaffolded. Uses Cencori cloud by default, falls back to local provider keys.",
   "arcie init": "`arcie init` scaffolds a new project. `arcie init my-project` creates the directory. Interactive prompts set up the model and API key.",
   "cencori": "Cencori provides the cloud gateway for model inference. Set `CENCORI_API_KEY` in `.env.local`. Supports OpenAI, Anthropic, Groq, DeepSeek, Mistral, Google, and Meta models.",
   "policies": "Policies in `policies/index.ts` enforce `inputGuards`, `outputGuards`, `allowedModels`, `blockedTools`, and budget limits.",

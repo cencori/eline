@@ -321,7 +321,7 @@ async function runInit(
   }
 
   // Install web-chat deps too (Next.js, arcie for the /api/chat route, etc.).
-  const webDir = join(targetDir, "channels", "web");
+  const webDir = join(targetDir, "web");
   if (!existsSync(join(webDir, "node_modules"))) {
     const webInstall = prompter.spinner("Installing web dependencies");
     try {

@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * - In prod: set `ARCIE_AGENT_DIR` on your host (or bundle agent/ into
  *   this Next.js app and adjust the fallback).
  *
- * Fallback assumes the standard `channels/web/` layout under a project
+ * Fallback assumes the standard `web/` layout under a project
  * root — i.e. `../../agent` relative to this app's cwd.
  */
 const AGENT_DIR = process.env.ARCIE_AGENT_DIR ?? resolve(process.cwd(), "../../agent");
