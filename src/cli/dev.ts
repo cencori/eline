@@ -421,11 +421,8 @@ export async function devCommand(options: DevOptions): Promise<void> {
     console.log(`  ${dimmed(`api    ${webChannel.url}/api/chat`)}`);
     // Provider keys are only the user's problem in BYOK mode — with a
     // Cencori key, models come from Cencori and no other key is needed.
-    if (missingKeys.length > 0 && !hasCencoriKey()) {
-      console.log();
-      console.log(`  ${grey("⚠")} Missing API keys: ${missingKeys.join(", ")}`);
-      console.log(`  ${dimmed("  Set them in .env.local, or set CENCORI_API_KEY to use Cencori models")}`);
-    }
+    console.log();
+    console.log(`  ${dimmed("set CENCORI_API_KEY to use Cencori models")}`);
     console.log();
     console.log(`  ${dimmed("hot reload  edits to agent/*.ts land on the next request")}`);
     console.log();
@@ -567,11 +564,8 @@ export async function devCommand(options: DevOptions): Promise<void> {
     console.log();
   }
   console.log(`  ${dimmed(`agent  http://localhost:${boundPort}`)}`);
-  if (missingKeys.length > 0 && !hasCencoriKey()) {
-    console.log();
-    console.log(`  ${grey("⚠")} Missing API keys: ${missingKeys.join(", ")}`);
-    console.log(`  ${dimmed("  Set them in .env.local, or set CENCORI_API_KEY to use Cencori models")}`);
-  }
+  console.log();
+  console.log(`  ${dimmed("set CENCORI_API_KEY to use Cencori models")}`);
   console.log();
   console.log(`  ${dimmed("hot reload  edits to agent/*.ts land on the next request")}`);
   console.log();
