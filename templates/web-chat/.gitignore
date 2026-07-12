@@ -7,3 +7,5 @@ node_modules
 next-env.d.ts
 *.log
 .DS_Store
+# copied from ../agent during prebuild
+agent

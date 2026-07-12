@@ -26,12 +26,20 @@ arcie dev
 # Vercel
 npx vercel
 
+# Brimble (auto-deploys on git push)
+# 1. Push your repo to GitHub
+# 2. Go to https://app.brimble.io → New project → connect repo
+# 3. Set root directory to `./web`
+# 4. Add env var: CENCORI_API_KEY
+# 5. Deploy — every push to the tracked branch triggers a new deploy
+
 # Any Node host
 npm run build && npm start
 ```
 
-Set `ARCIE_URL` in the host's environment to point at your deployed agent's
-HTTP endpoint.
+Set `CENCORI_API_KEY` (required) in the host's environment. The `agent/` directory is
+copied into `web/agent` automatically during build (`prebuild` script) so Next.js can
+find your agent runtime at deploy time.
 
 ## Customize
 

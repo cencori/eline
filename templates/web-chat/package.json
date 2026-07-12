@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "prebuild": "cp -r ../agent agent",
     "build": "next build",
+    "prestart": "cp -r ../agent agent 2>/dev/null; true",
     "start": "next start",
     "lint": "next lint"
   },
