@@ -25,6 +25,18 @@ my-agent/
 └── tsconfig.json
 ```
 
+## How it works
+
+1. **`agent.ts`** defines the model and config
+2. **Loader** discovers `tools/`, `subagents/`, `instructions.md`, `sessions/config.ts`, `policies/index.ts` and merges them with inline config
+3. **Runner** creates a Cencori session, sends turns with instructions + tool definitions, and processes the SSE event stream
+4. **Tool execution** happens locally — the model requests a tool call, the runner executes it, and results are sent back to Cencori to continue the turn
+5. **Memory processors** run before/after each turn to manage context
+6. **Hooks** fire at lifecycle events
+7. **Policies** enforce guardrails, blocked tools, and allowed models at every turn
+
+For local development, arcie ships a built-in LLM server (`arcie dev`) that supports OpenAI, Anthropic, Groq, DeepSeek, Mistral, Google, and Together — no Cencori dependency required.
+
 ## Quick Start
 
 ```bash
@@ -112,6 +124,15 @@ export default {
   allowedModels: ["claude-*", "gpt-4*"],
 };
 ```
+
+## Deploy
+
+```bash
+export CENCORI_API_KEY=sk_...
+npm run build
+```
+
+Push to GitHub and connect your repo to Brimble, Vercel, or any Node host.
 
 ## Docs
 

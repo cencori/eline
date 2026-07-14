@@ -83,9 +83,10 @@ export default {
 
 ```bash
 export CENCORI_API_KEY=sk_...
-
 npm run build
 ```
+
+Push to GitHub and connect your repo to Brimble, Vercel, or any Node host. Set `CENCORI_API_KEY` in the host's environment.
 
 ## Use the Programmatic API
 

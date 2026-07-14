@@ -26,7 +26,6 @@ import { defineAgent } from "arcie";
 export default defineAgent({
   model: "claude-sonnet-4-5",
   cencori: {
-    project: "proj_abc",
     billing: { budget: "50.00/month" },
   },
 });
@@ -50,6 +49,8 @@ export default defineTool({
   async execute(input) { ... },
 });
 ```
+
+All files in this directory are automatically discovered by the loader. No registration needed.
 
 ## knowledge/
 

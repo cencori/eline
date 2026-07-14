@@ -12,7 +12,6 @@ export default defineAgent({
   name: "my-agent",
   description: "Optional description for subagents",
   cencori: {
-    project: "proj_abc",
     billing: { budget: "50.00/month" },
     security: { policy: "standard" },
   },
@@ -29,7 +28,7 @@ export default defineAgent({
 | `model` | `string` | required | Model ID (`claude-sonnet-4-5`, `gpt-4o`, `llama-3.3-70b-versatile`) |
 | `name` | `string` | `undefined` | Agent name surfaced in observability |
 | `description` | `string` | `undefined` | Required for subagents; used by orchestrator for delegation |
-| `cencori` | `CencoriConfig` | `undefined` | Cencori cloud settings (project, billing, security) |
+| `cencori` | `CencoriConfig` | `undefined` | Cencori cloud settings (billing, security) |
 | `instructions` | `string` | `undefined` | Inline instructions; primary agents prefer `instructions.md` |
 | `tools` | `Record<string, ToolConfig>` | `{}` | Inline tool map; merged with filesystem `tools/` directory |
 | `subagents` | `Record<string, AgentConfig>` | `{}` | Inline subagents; merged with filesystem `subagents/` directory |
@@ -38,7 +37,6 @@ export default defineAgent({
 
 ```ts
 {
-  project?: string;       // Cencori project ID
   apiKey?: string;        // API key (also read from CENCORI_API_KEY env)
   billing?: {
     budget?: string;           // e.g. "50.00/month"
