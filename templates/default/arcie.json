@@ -15,7 +15,7 @@
       "installCommand": "npm install",
       "buildCommand": "npm run build",
       "startCommand": "npm start",
-      "env": ["CENCORI_API_KEY", "CENCORI_PROJECT_ID"]
+      "env": ["CENCORI_API_KEY"]
     }
   },
 

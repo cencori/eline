@@ -81,9 +81,9 @@ export function InputBar({
       <div className="mx-auto w-full max-w-3xl">
         <div
           className={cn(
-            "relative flex flex-col rounded-2xl border border-border/15 bg-muted/10 backdrop-blur-md p-3 transition-all",
-            "hover:border-border/25 hover:bg-muted/20",
-            "focus-within:border-border/25 focus-within:ring-1 focus-within:ring-white/5",
+            "relative flex flex-col rounded-2xl border border-border/60 bg-muted backdrop-blur-md p-3 transition-all",
+            "hover:border-border/70 hover:bg-muted",
+            "focus-within:border-border/80 focus-within:ring-1 focus-within:ring-white/20",
           )}
         >
           {pendingFiles.length > 0 && (

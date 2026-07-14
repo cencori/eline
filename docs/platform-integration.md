@@ -38,7 +38,7 @@ Ships in every scaffolded arcie project. Full schema:
       "installCommand": "npm install",
       "buildCommand": "npm run build",
       "startCommand": "npm start",
-      "env": ["CENCORI_API_KEY", "CENCORI_PROJECT_ID"]
+      "env": ["CENCORI_API_KEY"]
     }
   },
 
@@ -72,7 +72,7 @@ When you detect an arcie project (any of the three signals), configure the build
 | Start command | `npm start` in `./web` |
 | Port | `$PORT` (Next.js reads it automatically) |
 | Bind | `0.0.0.0` (Next.js handles) |
-| Required env | `CENCORI_API_KEY` (secret), `CENCORI_PROJECT_ID` (optional) |
+| Required env | `CENCORI_API_KEY` (secret) |
 
 Root install picks up shared dev tooling (`typescript`, etc.). The `./web` install pulls Next.js and the `arcie` runtime the API route calls. The stage step is critical — without it, Next's file tracing skips `./agent` and the deployed app can't load the agent runtime.
 

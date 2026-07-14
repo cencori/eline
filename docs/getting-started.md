@@ -83,7 +83,6 @@ export default {
 
 ```bash
 export CENCORI_API_KEY=sk_...
-export CENCORI_PROJECT_ID=proj_...
 
 npm run build
 ```
