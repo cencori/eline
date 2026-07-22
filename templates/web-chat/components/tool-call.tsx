@@ -26,6 +26,24 @@ function formatJSON(value: unknown): string {
   }
 }
 
+const TOOL_LABELS: Record<string, string> = {
+  document_extract: "Read document",
+  document_query: "Query document",
+  document_summarize: "Summarize document",
+  fetch_url: "Read page",
+  file_reader: "Read file",
+  grep: "Search files",
+  search_docs: "Search documentation",
+  vision_analyze: "Analyze image",
+  vision_classify: "Classify image",
+  vision_ocr: "Read image text",
+  web_search: "Search the web",
+};
+
+function toolLabel(name: string): string {
+  return TOOL_LABELS[name] ?? name.replaceAll("_", " ");
+}
+
 function summarize(input: unknown, max = 60): string {
   if (input === undefined || input === null) return "";
   if (typeof input !== "object") return String(input).slice(0, max);
@@ -49,6 +67,19 @@ function resultText(call: UiToolCall): string | undefined {
   if (call.status === "approval") return call.errorMessage ?? "awaiting approval";
   if (call.output === undefined || call.output === null) return undefined;
   if (typeof call.output === "string") {
+    try {
+      const parsed = JSON.parse(call.output) as unknown;
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+        const record = parsed as Record<string, unknown>;
+        if (typeof record.count === "number") {
+          return record.count === 0
+            ? "No documentation match"
+            : `${record.count} result${record.count === 1 ? "" : "s"}`;
+        }
+      }
+    } catch {
+      // Non-JSON output falls through to its first useful line.
+    }
     return call.output.split("\n").find((line) => line.trim().length > 0) ?? undefined;
   }
   if (typeof call.output !== "object") return String(call.output);
@@ -115,7 +146,7 @@ export function ToolCall({ call, onApprove, onDeny }: ToolCallProps) {
             )}
           </span>
         )}
-        <span className="font-mono font-semibold text-[11px] tracking-tight">{call.name}</span>
+        <span className="font-semibold text-[11px] tracking-[-0.01em]">{toolLabel(call.name)}</span>
         {call.kind === "subagent" && (
           <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-primary">
             <Bot className="h-2.5 w-2.5" />
@@ -219,6 +250,11 @@ const DISPLAY_FIELDS = ["analysis", "text", "summary", "answer", "classification
 
 function SmartOutput({ name, output, onCopy: onCopyProp }: { name: string; output: unknown; onCopy: (v: unknown) => void }) {
   const [copied, setCopied] = React.useState(false);
+  const handleCopy = (value: unknown) => {
+    onCopyProp(value);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1200);
+  };
 
   if (!DOCUMENT_TOOLS.has(name) || typeof output !== "object" || output === null) {
     return (
@@ -229,7 +265,7 @@ function SmartOutput({ name, output, onCopy: onCopyProp }: { name: string; outpu
           </span>
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onCopyProp(output); }}
+            onClick={(e) => { e.stopPropagation(); handleCopy(output); }}
             className="flex items-center gap-1 text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
           >
             {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
@@ -262,7 +298,7 @@ function SmartOutput({ name, output, onCopy: onCopyProp }: { name: string; outpu
           )}
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onCopyProp(output); }}
+            onClick={(e) => { e.stopPropagation(); handleCopy(output); }}
             className="flex items-center gap-1 text-[10px] text-muted-foreground/40 hover:text-muted-foreground transition-colors"
           >
             {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}

@@ -93,6 +93,300 @@
     --tw-prose-hr: hsl(var(--border));
   }
 
+  .ai-response {
+    color: hsl(var(--foreground) / 0.82);
+    font-size: 0.925rem;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+  }
+
+  .ai-response > :first-child {
+    margin-top: 0;
+  }
+
+  .ai-response > :last-child {
+    margin-bottom: 0;
+  }
+
+  .ai-response h1,
+  .ai-response h2,
+  .ai-response h3 {
+    color: hsl(var(--foreground));
+    text-wrap: balance;
+  }
+
+  .ai-response h1 {
+    margin: 0 0 0.55rem;
+    font-size: 1.125rem;
+    font-weight: 650;
+    letter-spacing: -0.025em;
+    line-height: 1.35;
+  }
+
+  .ai-response h2 {
+    margin: 1.75rem 0 0.55rem;
+    font-size: 1rem;
+    font-weight: 620;
+    letter-spacing: -0.018em;
+    line-height: 1.4;
+  }
+
+  .ai-response h3 {
+    margin: 1.35rem 0 0.45rem;
+    color: hsl(var(--foreground) / 0.72);
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.45;
+  }
+
+  .ai-response p {
+    margin: 0.55rem 0;
+    text-wrap: pretty;
+  }
+
+  .ai-response strong {
+    color: hsl(var(--foreground));
+    font-weight: 600;
+  }
+
+  .ai-response a {
+    color: hsl(var(--foreground));
+    font-weight: 500;
+    text-decoration-color: hsl(var(--muted-foreground) / 0.55);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+    transition: text-decoration-color 180ms ease, color 180ms ease;
+  }
+
+  .ai-response a:hover {
+    color: hsl(var(--foreground) / 0.78);
+    text-decoration-color: hsl(var(--foreground) / 0.8);
+  }
+
+  .ai-response ul,
+  .ai-response ol {
+    margin: 0.65rem 0 0.9rem;
+    padding-left: 1.2rem;
+  }
+
+  .ai-response ul {
+    list-style: disc;
+  }
+
+  .ai-response ol {
+    list-style: decimal;
+  }
+
+  .ai-response li {
+    margin: 0.3rem 0;
+    padding-left: 0.16rem;
+  }
+
+  .ai-response li::marker {
+    color: hsl(var(--muted-foreground) / 0.62);
+  }
+
+  .ai-response li > p {
+    margin: 0.2rem 0;
+  }
+
+  .ai-response input[type="checkbox"] {
+    margin-right: 0.45rem;
+    accent-color: hsl(var(--foreground));
+  }
+
+  .ai-response blockquote {
+    margin: 1rem 0;
+    border-left: 2px solid hsl(var(--border));
+    padding-left: 0.9rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .ai-response hr {
+    margin: 1.65rem 0;
+    border: 0;
+    border-top: 1px solid hsl(var(--border) / 0.75);
+  }
+
+  .ai-response hr + h1,
+  .ai-response hr + h2,
+  .ai-response hr + h3 {
+    margin-top: 0;
+  }
+
+  .ai-response table {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    margin: 1rem 0;
+    overflow-x: auto;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .ai-response th,
+  .ai-response td {
+    min-width: 8rem;
+    border-bottom: 1px solid hsl(var(--border) / 0.8);
+    padding: 0.55rem 0.75rem;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .ai-response th {
+    color: hsl(var(--foreground));
+    font-weight: 600;
+  }
+
+  .ai-response img {
+    max-width: 100%;
+    margin: 1rem 0;
+    border-radius: 0.75rem;
+  }
+
+  .ai-response .response-inline-code {
+    border: 1px solid hsl(var(--border) / 0.7);
+    border-radius: 0.35rem;
+    background: hsl(var(--muted));
+    padding: 0.12rem 0.36rem;
+    font-size: 0.82em;
+    font-weight: 500;
+    color: hsl(var(--foreground) / 0.9);
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+
+  .ai-response .response-inline-code::before,
+  .ai-response .response-inline-code::after {
+    content: none;
+  }
+
+  .ai-response .response-code-block pre {
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .ai-response .response-code-block code {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+  }
+
+  .ai-response .response-code-block code::before,
+  .ai-response .response-code-block code::after {
+    content: none;
+  }
+
+  .response-code-block .token.comment,
+  .response-code-block .token.prolog,
+  .response-code-block .token.doctype,
+  .response-code-block .token.cdata {
+    color: #6f7684;
+    font-style: italic;
+  }
+
+  .response-code-block .token.punctuation {
+    color: #f1f1f2;
+  }
+
+  .response-code-block .token.property,
+  .response-code-block .token.tag,
+  .response-code-block .token.constant,
+  .response-code-block .token.symbol,
+  .response-code-block .token.deleted {
+    color: #f4f4f5;
+  }
+
+  .response-code-block .token.boolean,
+  .response-code-block .token.number {
+    color: #eea078;
+  }
+
+  .response-code-block .token.selector,
+  .response-code-block .token.attr-name,
+  .response-code-block .token.string,
+  .response-code-block .token.char,
+  .response-code-block .token.builtin,
+  .response-code-block .token.inserted {
+    color: #f2a36f;
+  }
+
+  .response-code-block .token.operator,
+  .response-code-block .token.entity,
+  .response-code-block .token.url {
+    color: #e7a0c0;
+  }
+
+  .response-code-block .token.atrule,
+  .response-code-block .token.attr-value,
+  .response-code-block .token.keyword {
+    color: #c4a7ff;
+  }
+
+  .response-code-block .token.function,
+  .response-code-block .token.class-name {
+    color: #f4f4f5;
+  }
+
+  .response-code-block .token.regex,
+  .response-code-block .token.important,
+  .response-code-block .token.variable {
+    color: #86c995;
+  }
+
+  .response-code-block .token.bold,
+  .response-code-block .token.important {
+    font-weight: 600;
+  }
+
+  .response-code-block .token.italic {
+    font-style: italic;
+  }
+
+  .thinking-shimmer {
+    color: transparent;
+    background-color: hsl(var(--muted-foreground) / 0.48);
+    background-image: linear-gradient(
+      105deg,
+      transparent 0%,
+      transparent 38%,
+      hsl(var(--foreground) / 0.9) 50%,
+      transparent 62%,
+      transparent 100%
+    );
+    background-size: 90px 100%;
+    background-repeat: no-repeat;
+    background-clip: text;
+    -webkit-background-clip: text;
+    animation: thinking-shimmer 2.34s linear infinite;
+    will-change: background-position;
+  }
+
+  @keyframes thinking-shimmer {
+    0%,
+    12% {
+      background-position: -45px 0;
+    }
+    88%,
+    100% {
+      background-position: calc(100% + 45px) 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .thinking-shimmer {
+      animation: none;
+      background: none;
+      color: hsl(var(--muted-foreground));
+    }
+  }
+
   nextjs-portal,
   [data-nextjs-dev-overlay],
   [data-nextjs-toast-wrapper],

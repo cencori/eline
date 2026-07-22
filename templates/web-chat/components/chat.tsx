@@ -39,6 +39,28 @@ function newId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+const STREAM_REVEAL_THRESHOLD = 80;
+const STREAM_REVEAL_CHUNK_SIZE = 18;
+const STREAM_REVEAL_DELAY_MS = 20;
+
+function splitStreamDelta(delta: string): string[] {
+  const tokens = delta.match(/\s+|[^\s]+/g) ?? [delta];
+  const chunks: string[] = [];
+  let chunk = "";
+
+  for (const token of tokens) {
+    if (chunk.length > 0 && chunk.length + token.length > STREAM_REVEAL_CHUNK_SIZE) {
+      chunks.push(chunk);
+      chunk = token;
+    } else {
+      chunk += token;
+    }
+  }
+
+  if (chunk.length > 0) chunks.push(chunk);
+  return chunks;
+}
+
 export function Chat() {
   const [messages, setMessages] = React.useState<UiMessage[]>([]);
   const [streaming, setStreaming] = React.useState(false);
@@ -112,9 +134,27 @@ export function Chat() {
   }, [patchMessage]);
 
   const streamInto = React.useCallback(
-    async (assistantId: string, response: Response) => {
+    async (assistantId: string, response: Response, signal: AbortSignal) => {
       const patchAssistant = (patch: (prev: UiMessage) => UiMessage) =>
         patchMessage(assistantId, patch);
+
+      const appendText = async (delta: string) => {
+        if (delta.length === 0) return;
+
+        const chunks =
+          delta.length >= STREAM_REVEAL_THRESHOLD ? splitStreamDelta(delta) : [delta];
+
+        for (const chunk of chunks) {
+          if (signal.aborted) return;
+          patchAssistant((m) => ({ ...m, content: `${m.content}${chunk}` }));
+
+          if (chunks.length > 1) {
+            await new Promise<void>((resolve) => {
+              window.setTimeout(resolve, STREAM_REVEAL_DELAY_MS);
+            });
+          }
+        }
+      };
 
       const patchToolCall = (callId: string, patch: (prev: UiToolCall) => UiToolCall) => {
         patchAssistant((m) => {
@@ -129,6 +169,7 @@ export function Chat() {
       let firstEvent = true;
 
       for await (const event of readArcieStream(response)) {
+        if (signal.aborted) break;
         if (firstEvent) {
           firstEvent = false;
           clearFileLoading();
@@ -141,7 +182,7 @@ export function Chat() {
           }
           case "message.appended": {
             const delta = (event.data as { delta?: string }).delta ?? "";
-            patchAssistant((m) => ({ ...m, content: `${m.content}${delta}` }));
+            await appendText(delta);
             break;
           }
           case "message.completed": {
@@ -215,7 +256,7 @@ export function Chat() {
         }
       }
     },
-    [patchMessage],
+    [patchMessage, clearFileLoading],
   );
 
   const runRequest = React.useCallback(
@@ -243,7 +284,7 @@ export function Chat() {
           }));
           return;
         }
-        await streamInto(assistantId, response);
+        await streamInto(assistantId, response, controller.signal);
       } catch (error) {
         clearFileLoading();
         if (!controller.signal.aborted) {

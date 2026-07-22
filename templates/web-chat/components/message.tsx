@@ -1,13 +1,16 @@
 "use client";
 
 import * as React from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { AlertTriangle, Check, ChevronDown, ChevronRight, Copy, RotateCcw } from "lucide-react";
+import { AlertTriangle, Check, Copy, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UiMessage } from "@/lib/types";
-import { ToolCall } from "@/components/tool-call";
+import { parseAssistantOutput } from "@/lib/assistant-output";
+import { normalizeMarkdownHierarchy } from "@/lib/markdown-hierarchy";
 import { ImagePreview } from "@/components/image-preview";
+import { CodeBlock } from "@/components/code-block";
+import { ActivityPanel } from "@/components/activity-panel";
 
 interface MessageProps {
   message: UiMessage;
@@ -18,31 +21,62 @@ interface MessageProps {
   onDeny?(): void;
 }
 
+interface MarkdownCodeProps {
+  className?: string;
+  children?: React.ReactNode;
+}
+
 export function Message({ message, isLast, onCopy, onRegenerate, onApprove, onDeny }: MessageProps) {
   const isUser = message.role === "user";
   const [copied, setCopied] = React.useState(false);
-  const [toolCallsOpen, setToolCallsOpen] = React.useState(false);
 
-  const hasRunningToolCalls =
-    message.toolCalls?.some((c) => c.status === "running" || c.status === "approval") ?? false;
   const hasToolCalls = (message.toolCalls?.length ?? 0) > 0;
-  const isThinking = message.streaming && message.content.length === 0 && (!hasToolCalls || hasRunningToolCalls);
-
-  const toolSummary = React.useMemo(() => {
-    if (!hasToolCalls) return null;
-    const names = [...new Set(message.toolCalls!.map((c) => c.name))];
-    const rest = message.toolCalls!.length - names.length;
-    let label = names.join(", ");
-    if (rest > 0) label += ` (${message.toolCalls!.length} calls)`;
-    return label;
-  }, [message.toolCalls, hasToolCalls]);
+  const parsedOutput = React.useMemo(
+    () => parseAssistantOutput(message.content, {
+      streaming: message.streaming === true,
+      hasToolContext: hasToolCalls,
+    }),
+    [message.content, message.streaming, hasToolCalls],
+  );
+  const visibleContent = parsedOutput.text;
+  const renderedContent = React.useMemo(
+    () => normalizeMarkdownHierarchy(visibleContent),
+    [visibleContent],
+  );
+  const hasActivity =
+    hasToolCalls || parsedOutput.artifacts.length > 0 || Boolean(message.reasoning);
+  const showActivity = hasActivity || message.streaming === true;
 
   const handleCopy = () => {
     if (onCopy === undefined) return;
-    onCopy(message.content);
+    onCopy(visibleContent);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1500);
   };
+
+  const markdownComponents = React.useMemo<Components>(
+    () => ({
+      pre: ({ children }: React.ComponentPropsWithoutRef<"pre">) => {
+        const child = React.Children.toArray(children)[0];
+        if (!React.isValidElement<MarkdownCodeProps>(child)) {
+          return <pre>{children}</pre>;
+        }
+
+        const language = child.props.className?.match(/language-([^\s]+)/)?.[1];
+        const code = String(child.props.children ?? "");
+        return <CodeBlock code={code} language={language} onCopy={onCopy} />;
+      },
+      code: ({ className, children, ...props }: React.ComponentPropsWithoutRef<"code">) => (
+        <code className={cn("response-inline-code", className)} {...props}>
+          {children}
+        </code>
+      ),
+      h4: ({ children }) => <h3>{children}</h3>,
+      h5: ({ children }) => <h3>{children}</h3>,
+      h6: ({ children }) => <h3>{children}</h3>,
+    }),
+    [onCopy],
+  );
 
   if (isUser) {
     return (
@@ -75,76 +109,34 @@ export function Message({ message, isLast, onCopy, onRegenerate, onApprove, onDe
           </div>
         )}
 
-        {message.reasoning && (
-          <details className="text-[11px] text-muted-foreground/70 border border-border/20 rounded-lg px-2.5 py-1.5 bg-muted/10">
-            <summary className="cursor-pointer select-none font-medium">thinking</summary>
-            <div className="mt-1.5 whitespace-pre-wrap italic leading-relaxed">
-              {message.reasoning}
-            </div>
-          </details>
+        {showActivity && (
+          <ActivityPanel
+            key={message.streaming === true ? "working" : "thought"}
+            artifacts={parsedOutput.artifacts}
+            hasVisibleContent={visibleContent.length > 0}
+            latencyMs={message.latencyMs}
+            reasoning={message.reasoning}
+            streaming={message.streaming === true}
+            toolCalls={message.toolCalls ?? []}
+            onApprove={onApprove}
+            onDeny={onDeny}
+          />
         )}
 
-        {isThinking ? (
-          <span className="inline-flex items-center gap-[3px]">
-            <span
-              className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce"
-              style={{ animationDelay: "0ms" }}
-            />
-            <span
-              className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce"
-              style={{ animationDelay: "150ms" }}
-            />
-            <span
-              className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 animate-bounce"
-              style={{ animationDelay: "300ms" }}
-            />
-          </span>
-        ) : (
-          message.content.length > 0 && (
-            <div
-              className={cn(
-                "prose prose-sm prose-zinc max-w-none dark:prose-invert",
-                "prose-p:my-2 prose-p:leading-relaxed prose-p:text-sm",
-                "prose-pre:my-2 prose-pre:text-sm",
-                "prose-code:text-sm prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none",
-                message.errored && "text-destructive",
-              )}
-            >
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
-            </div>
-          )
-        )}
-
-        {hasToolCalls && !isThinking && (
-          <div className="flex flex-col gap-1.5">
-            {!toolCallsOpen ? (
-              <button
-                type="button"
-                onClick={() => setToolCallsOpen(true)}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors w-fit"
-              >
-                <ChevronRight className="h-3 w-3" />
-                <span>used {toolSummary}</span>
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setToolCallsOpen(false)}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors w-fit mb-1"
-                >
-                  <ChevronDown className="h-3 w-3" />
-                  <span>used {toolSummary}</span>
-                </button>
-                {message.toolCalls!.map((call) => (
-                  <ToolCall key={call.callId} call={call} onApprove={onApprove} onDeny={onDeny} />
-                ))}
-              </>
+        {visibleContent.length > 0 && (
+          <article
+            className={cn(
+              "ai-response w-full max-w-[44rem]",
+              message.errored && "text-destructive",
             )}
-          </div>
+          >
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {renderedContent}
+            </ReactMarkdown>
+          </article>
         )}
 
-        {!message.streaming && message.content.length > 0 && (
+        {!message.streaming && visibleContent.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
             {onCopy && (
               <button
